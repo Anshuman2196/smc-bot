@@ -1,6 +1,8 @@
 const c=require("./config"),gh=require("./github"),a=require("./agent"),{pingServer}=require("./mcping");
 const sleep=m=>new Promise(r=>setTimeout(r,m));
 let busy=null;
+const COOLDOWN_MS=15000;
+let lastActionAt=0;
 
 async function wait(label,fn,timeout=600000,progress=()=>{},interval=3000){
  const start=Date.now(),end=start+timeout;
@@ -13,6 +15,11 @@ async function wait(label,fn,timeout=600000,progress=()=>{},interval=3000){
  throw new Error("Timed out: "+label);
 }
 async function probe(){try{return await pingServer(c.host,c.port,5000)}catch{return null}}
+function throttle(){
+ const remaining=COOLDOWN_MS-(Date.now()-lastActionAt);
+ if(remaining>0)throw new Error(`Please slow down — wait ${Math.ceil(remaining/1000)}s before trying again.`);
+ lastActionAt=Date.now();
+}
 
 async function snapshot(){
  let s={codespace:"offline",mc:"offline",playit:"offline",players:null,max:null,uptimeSec:null,errors:[]};
@@ -20,6 +27,7 @@ async function snapshot(){
  catch(e){s.errors.push(e.message);return s}
  if(s.codespace!=="online")return s;
  try{
+  if(!a.alive())throw new Error("SMC agent offline");
   let x=await a.status();
   s.mc={stopped:"offline",starting:"starting",running:"running",stopping:"stopping"}[x.minecraft]||"unknown";
   s.playit=x.playit==="running"?"connecting":"offline";
@@ -32,7 +40,7 @@ async function snapshot(){
 
 async function start(progress=()=>{}){
  if(busy)throw new Error("Another operation is in progress");
- busy="start";
+ throttle();busy="start";
  try{
   let st=await gh.getState();
   if(st==="ShuttingDown"){
@@ -47,17 +55,11 @@ async function start(progress=()=>{}){
   }else{
    progress("Waiting for Codespace…");
   }
-
   await wait("Waiting for Codespace",async()=>await gh.getState()==="Available",900000,progress);
-
-  // The agent heartbeat is independent of a queued command. This avoids
-  // confusing a live agent with a command that happens to be waiting.
   await wait("Waiting for SMC agent",()=>a.alive(),300000,progress,2000);
-
   const x=await a.status();
   if(x.minecraft==="stopped")await a.startMinecraft();
   if(x.playit!=="running")await a.startPlayit().catch(()=>{});
-
   await wait("Waiting for Minecraft",async()=> (await a.status()).minecraft==="running",360000,progress);
   await wait("Waiting for Playit tunnel",async()=>!!await probe(),180000,progress);
   return snapshot();
@@ -66,7 +68,7 @@ async function start(progress=()=>{}){
 
 async function stop(progress=()=>{}){
  if(busy)throw new Error("Another operation is in progress");
- busy="stop";
+ throttle();busy="stop";
  try{
   const st=await gh.getState();
   if(st!=="Available")return{already:true};
@@ -81,4 +83,4 @@ async function stop(progress=()=>{}){
  }finally{busy=null}
 }
 
-module.exports={snapshot,startServer:start,stopServer:stop,restartServer:start,overall:s=>s.mc==="unknown"?"error":s.codespace==="offline"?"offline":s.mc==="running"&&s.playit==="connected"?"online":"starting",isBusy:()=>busy};
+module.exports={snapshot,startServer:start,stopServer:stop,restartServer:start,overall:s=>s.mc==="unknown"?"error":s.codespace==="offline"?"offline":s.mc==="running"&&s.playit==="connected"?"online":"starting",isBusy:()=>busy,whitelistAdd:a.whitelistAdd};
