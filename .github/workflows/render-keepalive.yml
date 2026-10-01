@@ -1,0 +1,16 @@
+name: Keep Render bot awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render health endpoint
+        env:
+          SMC_BOT_URL: https://smc-bot-dnnh.onrender.com
+        run: |
+          curl --fail --silent --show-error --max-time 20 "$SMC_BOT_URL/health"
