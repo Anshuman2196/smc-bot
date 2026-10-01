@@ -3,7 +3,7 @@ let id=1;
 const q=[],pending=new Map(),waiters=[];
 let lastSeen=0;
 
-function enqueue(type,args={},timeout=30000){
+function enqueue(type,args={},timeout=90000){
  const i=Date.now()+"-"+id++;
  return new Promise((resolve,reject)=>{
   const timer=setTimeout(()=>{pending.delete(i);reject(new Error("SMC agent did not respond to "+type))},timeout);
@@ -30,4 +30,4 @@ function result(p){
 function auth(r){return r.headers.authorization===`Bearer ${cfg.agentToken}`}
 function heartbeat(){lastSeen=Date.now()}
 function alive(maxAge=90000){return lastSeen>0&&Date.now()-lastSeen<maxAge}
-module.exports={auth,poll,result,heartbeat,alive,status:()=>enqueue("status",{},30000),players:()=>enqueue("players"),startMinecraft:()=>enqueue("minecraft.start",{},120000),stopMinecraft:()=>enqueue("minecraft.stop"),startPlayit:()=>enqueue("playit.start")};
+module.exports={auth,poll,result,heartbeat,alive,status:()=>enqueue("status",{},90000),players:()=>enqueue("players",{},90000),startMinecraft:()=>enqueue("minecraft.start",{},120000),stopMinecraft:()=>enqueue("minecraft.stop",{},90000),startPlayit:()=>enqueue("playit.start",{},90000),whitelistAdd:name=>enqueue("whitelist.add",{name},90000)};
