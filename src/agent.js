@@ -1,33 +1,72 @@
-const cfg=require("./config");
-let id=1;
-const q=[],pending=new Map(),waiters=[];
-let lastSeen=0;
+const cfg = require("./config");
 
-function enqueue(type,args={},timeout=90000){
- const i=Date.now()+"-"+id++;
- return new Promise((resolve,reject)=>{
-  const timer=setTimeout(()=>{pending.delete(i);reject(new Error("SMC agent did not respond to "+type))},timeout);
-  pending.set(i,{resolve,reject,timer});
-  q.push({id:i,type,args});
-  wake();
- });
+const queue = [];
+const pending = new Map();
+const waiters = new Set();
+let lastSeen = 0;
+let sequence = 1;
+
+function heartbeat() { lastSeen = Date.now(); }
+function alive(maxAge = cfg.agentStaleMs) { return lastSeen > 0 && Date.now() - lastSeen <= maxAge; }
+
+function enqueue(type, args = {}, timeout = cfg.commandTimeoutMs) {
+  const id = `${Date.now()}-${sequence++}`;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pending.delete(id);
+      reject(new Error(`SMC agent did not respond to ${type}`));
+    }, timeout);
+    pending.set(id, { resolve, reject, timer, type });
+    queue.push({ id, type, args });
+    wake();
+  });
 }
-function wake(){if(q.length&&waiters.length)waiters.shift()(q.shift())}
-function poll(){
- if(q.length)return Promise.resolve(q.shift());
- return new Promise(resolve=>{
-  const t=setTimeout(()=>{const i=waiters.indexOf(resolve);if(i>=0)waiters.splice(i,1);resolve({})},25000);
-  waiters.push(c=>{clearTimeout(t);resolve(c)});
- });
+
+function wake() {
+  while (queue.length && waiters.size) {
+    const waiter = waiters.values().next().value;
+    waiters.delete(waiter);
+    waiter(queue.shift());
+  }
 }
-function result(p){
- const j=p&&pending.get(p.id);
- if(!j)return false;
- pending.delete(p.id);clearTimeout(j.timer);
- p.ok?j.resolve(p.data):j.reject(new Error(p.error||"agent command failed"));
- return true;
+
+function poll() {
+  heartbeat();
+  if (queue.length) return Promise.resolve(queue.shift());
+  return new Promise(resolve => {
+    const waiter = value => {
+      clearTimeout(waiter.timer);
+      waiters.delete(waiter);
+      resolve(value);
+    };
+    waiter.timer = setTimeout(() => {
+      waiters.delete(waiter);
+      resolve({});
+    }, cfg.pollWaitMs);
+    waiters.add(waiter);
+  });
 }
-function auth(r){return r.headers.authorization===`Bearer ${cfg.agentToken}`}
-function heartbeat(){lastSeen=Date.now()}
-function alive(maxAge=90000){return lastSeen>0&&Date.now()-lastSeen<maxAge}
-module.exports={auth,poll,result,heartbeat,alive,status:()=>enqueue("status",{},90000),players:()=>enqueue("players",{},90000),startMinecraft:()=>enqueue("minecraft.start",{},120000),stopMinecraft:()=>enqueue("minecraft.stop",{},90000),startPlayit:()=>enqueue("playit.start",{},90000),whitelistAdd:name=>enqueue("whitelist.add",{name},90000)};
+
+function result(payload) {
+  heartbeat();
+  const job = payload && pending.get(payload.id);
+  if (!job) return false;
+  pending.delete(payload.id);
+  clearTimeout(job.timer);
+  if (payload.ok) job.resolve(payload.data);
+  else job.reject(new Error(payload.error || `${job.type} failed`));
+  return true;
+}
+
+function auth(req) { return req.headers.authorization === `Bearer ${cfg.agentToken}`; }
+function queueInfo() { return { queued: queue.length, pending: pending.size, alive: alive() }; }
+
+module.exports = {
+  auth, poll, result, heartbeat, alive, queueInfo,
+  status: () => enqueue("status", {}, cfg.statusTimeoutMs),
+  players: () => enqueue("players", {}, cfg.commandTimeoutMs),
+  startMinecraft: () => enqueue("minecraft.start", {}, cfg.startTimeoutMs),
+  stopMinecraft: () => enqueue("minecraft.stop", {}, cfg.stopTimeoutMs),
+  startPlayit: () => enqueue("playit.start", {}, cfg.commandTimeoutMs),
+  whitelistAdd: name => enqueue("whitelist.add", { name }, cfg.commandTimeoutMs)
+};
