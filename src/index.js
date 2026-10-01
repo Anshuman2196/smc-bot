@@ -1,7 +1,22 @@
 const http=require("http"),{Client,GatewayIntentBits}=require("discord.js"),c=require("./config"),ctl=require("./controller"),agent=require("./agent");
 const client=new Client({intents:[GatewayIntentBits.Guilds,GatewayIntentBits.GuildMessages,GatewayIntentBits.MessageContent]});
 const reply=(m,x)=>m.reply({content:x,allowedMentions:{repliedUser:false}});
-client.on("messageCreate",async m=>{if(m.author.bot||!m.guild)return;const p=m.content.trim().split(/\s+/);if(p[0]?.toLowerCase()!=="smc")return;const cmd=(p[1]||"help").toLowerCase();try{if(cmd==="status"){const s=await ctl.snapshot();return reply(m,`SMC Status\n\nCodespace: ${s.codespace}\nMinecraft: ${s.mc}\nPlayit: ${s.playit}\nPlayers: ${s.players??"—"}/${s.max??"—"}\nUptime: ${s.uptimeSec==null?"—":Math.floor(s.uptimeSec/60)+"m"}\n\nAddress: ${c.host}`)}if(cmd==="start"||cmd==="stop"){const sent=await reply(m,cmd==="start"?"🟡 Starting SMC…":"🟡 Stopping SMC…");const r=cmd==="start"?await ctl.startServer(x=>sent.edit(x).catch(()=>{})):await ctl.stopServer(x=>sent.edit(x).catch(()=>{}));return sent.edit(cmd==="start"?`🟢 SMC online!\n\n${c.host}`:"🔴 SMC stopped.")}if(cmd==="restart"){const s=await ctl.startServer(x=>reply(m,x));return reply(m,`🟢 SMC restarted.\n${c.host}`)}return reply(m,"SMC commands: start, stop, restart, status")}catch(e){return reply(m,`⚠️ ${e.message}`)}});
+client.on("messageCreate",async m=>{if(m.author.bot||!m.guild)return;const p=m.content.trim().split(/\s+/);if(p[0]?.toLowerCase()!=="smc")return;const cmd=(p[1]||"help").toLowerCase();try{if(cmd==="status"){const s=await ctl.snapshot();return reply(m,`SMC Status\n\nCodespace: ${s.codespace}\nMinecraft: ${s.mc}\nPlayit: ${s.playit}\nPlayers: ${s.players??"—"}/${s.max??"—"}\nUptime: ${s.uptimeSec==null?"—":Math.floor(s.uptimeSec/60)+"m"}\n\nAddress: ${c.host}`)}if(cmd==="start"||cmd==="stop"){const sent=await reply(m,cmd==="start"?"🟡 Starting SMC…":"🟡 Stopping SMC…");const r=cmd==="start"?await ctl.startServer(x=>sent.edit(x).catch(()=>{})):await ctl.stopServer(x=>sent.edit(x).catch(()=>{}));return sent.edit(cmd==="start"?`🟢 SMC online!\n\n${c.host}`:"🔴 SMC stopped.")}if(cmd==="restart"){await ctl.startServer(x=>reply(m,x));return reply(m,`🟢 SMC restarted.\n${c.host}`)}return reply(m,"SMC commands: start, stop, restart, status")}catch(e){return reply(m,`⚠️ ${e.message}`)}});
 function body(req){return new Promise((ok,no)=>{let b="";req.on("data",x=>b+=x);req.on("end",()=>{try{ok(b?JSON.parse(b):{})}catch(e){no(e)}})})}
-http.createServer(async(req,res)=>{try{if(req.method==="GET"&&req.url==="/health")return res.end("ok");if(req.method==="POST"&&req.url==="/agent/poll"){if(!agent.auth(req))return res.writeHead(401).end();res.setHeader("Content-Type","application/json");return res.end(JSON.stringify(await agent.poll()))}if(req.method==="POST"&&req.url==="/agent/result"){if(!agent.auth(req))return res.writeHead(401).end();agent.result(await body(req));return res.end('{"ok":true}')}res.writeHead(404).end()}catch(e){res.writeHead(500).end(JSON.stringify({error:e.message}))}}).listen(c.httpPort,()=>console.log("HTTP listening",c.httpPort));
+http.createServer(async(req,res)=>{try{
+ if(req.method==="GET"&&req.url==="/health")return res.end("ok");
+ if(req.method==="POST"&&req.url==="/agent/poll"){
+  if(!agent.auth(req))return res.writeHead(401).end();
+  agent.heartbeat();
+  res.setHeader("Content-Type","application/json");
+  return res.end(JSON.stringify(await agent.poll()));
+ }
+ if(req.method==="POST"&&req.url==="/agent/result"){
+  if(!agent.auth(req))return res.writeHead(401).end();
+  agent.heartbeat();
+  agent.result(await body(req));
+  return res.end('{"ok":true}');
+ }
+ res.writeHead(404).end();
+}catch(e){res.writeHead(500).end(JSON.stringify({error:e.message}))}}).listen(c.httpPort,()=>console.log("HTTP listening",c.httpPort));
 client.login(c.discordToken);
