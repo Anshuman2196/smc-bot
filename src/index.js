@@ -205,8 +205,7 @@ ${pick("restart")}`);
 ${pick("online")}
 
 ${format(result)}`);
-      if (command === "stop") return working.edit("🔴 **Stopped**
-The server is safely offline.");
+      if (command === "stop") return working.edit(`🔴 **Stopped**\nThe server is safely offline.`);
       if (command === "restart") return working.edit(`🟢 **Restarted**
 ${pick("online")}
 
@@ -244,7 +243,7 @@ setInterval(async () => {
     const compact = [s.codespace, s.minecraft, s.playit, s.publicAddress, s.players?.online ?? null].join("|");
     if (monitorSnapshot && compact !== monitorSnapshot) {
       const old = monitorSnapshot.split("|");
-      if (s.minecraft !== old[1]) await notify(s.minecraft === "running" ? "🟢 **Minecraft is back online.**" : "🌙 **Minecraft is offline for now.**");
+      if (s.minecraft !== old[1] && s.minecraft === "running") await notify("🟢 **Minecraft is back online.**");
       if (s.publicAddress && s.publicAddress !== old[3]) await notify(`🌐 **Playit address:** ${s.publicAddress}`);
     }
 
