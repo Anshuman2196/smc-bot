@@ -13,6 +13,4 @@ jobs:
         with:
           node-version: 22
       - run: npm install --ignore-scripts
-      - run: node --check src/index.js
-      - run: node --check src/controller.js
-      - run: node --check src/agent.js
+      - run: npm run check
