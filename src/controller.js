@@ -26,12 +26,12 @@ async function ensureAgent(report) {
   }, 1500);
 }
 async function liveStatus() {
-  const result = { codespace: "offline", agent: "offline", minecraft: "offline", playit: "offline", publicAddress: null, players: null, maxPlayers: null, uptimeSec: null, crashed: false, lastStopReason: "none", crashStreak: 0, lastCrashAt: null, lastExit: null, whitelist: [], error: null };
+  const result = { codespace: "offline", agent: "offline", minecraft: "offline", playit: "offline", publicAddress: null, players: null, maxPlayers: null, uptimeSec: null, crashed: false, lastActionResult: null, lastStopReason: "none", crashStreak: 0, lastCrashAt: null, lastExit: null, whitelist: [], error: null };
   try { const s = await github.state(); result.codespace = s === "Available" ? "online" : s === "ShuttingDown" ? "stopping" : "offline"; } catch (e) { result.error = e.message; return result; }
   if (result.codespace !== "online") return result;
   if (!agent.connected()) return result;
   result.agent = "online";
-  try { const s = agent.status(); Object.assign(result, { minecraft: s.minecraft || "unknown", playit: s.playit || "unknown", publicAddress: s.publicAddress || null, minecraftPort: Boolean(s.minecraftPort), crashed: Boolean(s.crashed), lastStopReason: s.lastStopReason || "none", crashStreak: s.crashStreak || 0, lastCrashAt: s.lastCrashAt || null, lastExit: s.lastExit ?? null, logTail: Array.isArray(s.logTail) ? s.logTail : [], players: s.players || null, maxPlayers: s.players?.max ?? s.maxPlayers ?? null, uptimeSec: s.uptimeSec ?? null, whitelist: Array.isArray(s.whitelist) ? s.whitelist : [], serverProperties: s.serverProperties || {} }); } catch (e) { result.error = e.message; }
+  try { const s = agent.status(); Object.assign(result, { minecraft: s.minecraft || "unknown", playit: s.playit || "unknown", publicAddress: s.publicAddress || null, minecraftPort: Boolean(s.minecraftPort), crashed: Boolean(s.crashed), lastStopReason: s.lastStopReason || "none", crashStreak: s.crashStreak || 0, lastCrashAt: s.lastCrashAt || null, lastExit: s.lastExit ?? null, lastActionResult: s.lastActionResult || null, logTail: Array.isArray(s.logTail) ? s.logTail : [], players: s.players || null, maxPlayers: s.players?.max ?? s.maxPlayers ?? null, uptimeSec: s.uptimeSec ?? null, whitelist: Array.isArray(s.whitelist) ? s.whitelist : [], serverProperties: s.serverProperties || {} }); } catch (e) { result.error = e.message; }
   return result;
 }
 async function startServer(report = async () => {}) {
@@ -101,7 +101,11 @@ async function requireLive() {
   if (s.minecraft !== "running") throw new Error("Minecraft is not running.");
   return s;
 }
-async function minecraftAction(fn, args) { await requireLive(); return fn(...(args || [])); }
+async function minecraftAction(fn, args) {
+  await requireLive();
+  const item = fn(...(args || []));
+  return agent.waitForAction(item.id);
+}
 function formatHealth(s) {
   const p = s.players;
   return ["**SMC health**", `Codespace: **${s.codespace}**`, `Agent: **${s.agent}**`, `Minecraft: **${s.minecraft}**`, `Playit: **${s.playit}**`, `Port: **${s.minecraftPort ? "open" : "closed"}**`, `Players: **${p?.online ?? "—"}/${p?.max ?? s.maxPlayers ?? "—"}**`, `Uptime: **${s.uptimeSec == null ? "—" : Math.floor(s.uptimeSec / 60) + "m " + s.uptimeSec % 60 + "s"}**`, `Address: **${s.publicAddress || "not available"}**`, s.error ? "Error: `" + s.error + "`" : "Errors: **none reported**"].join("\n");
@@ -114,7 +118,7 @@ module.exports = {
   operation: () => operation,
   kick: name => minecraftAction(agent.kick, [name]), ban: name => minecraftAction(agent.ban, [name]), pardon: name => minecraftAction(agent.pardon, [name]),
   op: name => minecraftAction(agent.op, [name]), deop: name => minecraftAction(agent.deop, [name]),
-  whitelistAdd: name => minecraftAction(agent.whitelistAdd, [name]), whitelistRemove: name => minecraftAction(agent.whitelistRemove, [name]), whitelistClear: async () => { const s = await requireLive(); for (const name of (s.whitelist || [])) agent.whitelistRemove(name); return { queued: (s.whitelist || []).length }; },
+  whitelistAdd: name => minecraftAction(agent.whitelistAdd, [name]), whitelistRemove: name => minecraftAction(agent.whitelistRemove, [name]), whitelistClear: () => minecraftAction(agent.whitelistClear),
   say: message => minecraftAction(agent.say, [message]), save: () => minecraftAction(agent.save), seed: () => minecraftAction(agent.seed), tps: () => minecraftAction(agent.tps), version: () => minecraftAction(agent.version),
   command: command => minecraftAction(agent.command, [command]),
   propertySet: (key, value) => minecraftAction(agent.propertySet, [key, value]),
