@@ -23,7 +23,7 @@ module.exports = Object.freeze({
   port: number("PUBLIC_PORT", 25565),
   httpPort: number("PORT", 10000),
   idleMinutes: number("IDLE_SHUTDOWN_MINUTES", 5),
-  agentStaleMs: number("AGENT_STALE_MS", 15000),
+  agentStaleMs: number("AGENT_STALE_MS", 60000),
   pollWaitMs: number("AGENT_POLL_WAIT_MS", 10000),
   commandTimeoutMs: number("AGENT_COMMAND_TIMEOUT_MS", 60000),
   startTimeoutMs: number("AGENT_START_TIMEOUT_MS", 480000),
