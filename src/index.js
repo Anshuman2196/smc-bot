@@ -3,7 +3,7 @@ const {Client,GatewayIntentBits}=require('discord.js');
 const c=require('./config');
 const ctl=require('./controller');
 const agent=require('./agent');
-const client=new Client({intents:[GatewayIntentBits.Guilds,GuildMessages=GatewayIntentBits.GuildMessages,GatewayIntentBits.MessageContent]});
+const client=new Client({intents:[GatewayIntentBits.Guilds,GatewayIntentBits.GuildMessages,GatewayIntentBits.MessageContent]});
 const reply=(m,x)=>m.reply({content:x,allowedMentions:{repliedUser:false}});
 const isControl=m=>m&&(c.adminIds.includes(m.id)||c.controlRoleIds.length&&m.roles?.cache?.some(r=>c.controlRoleIds.includes(r.id))||(!c.adminIds.length&&!c.controlRoleIds.length));
 const allowed=id=>!c.allowedChannelIds.length||c.allowedChannelIds.includes(id);
@@ -21,10 +21,7 @@ const server=http.createServer(async(req,res)=>{
  if(req.method==='GET'&&(req.url==='/'||req.url==='/health'))return send(200,{ok:true,agent:agent.queueInfo()});
  if(req.method==='POST'&&(req.url==='/agent/poll'||req.url==='/agent/result')){
   if(!agent.auth(req))return send(401,{error:'unauthorized'});
-  if(req.url==='/agent/poll'){
-   const job=agent.poll();
-   return send(200,job);
-  }
+  if(req.url==='/agent/poll')return send(200,agent.poll());
   let raw='';req.on('data',chunk=>raw+=chunk);req.on('end',()=>{try{send(200,{ok:agent.result(JSON.parse(raw||'{}'))})}catch(e){send(400,{error:e.message})}});return;
  }
  return send(404,{error:'not_found'});
