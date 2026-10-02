@@ -101,7 +101,14 @@ async function start(progress = async () => {}) {
 
 async function stopInternal(progress, enforceCooldown) {
   if (enforceCooldown) cooldown();
-  if ((await gh.getState()) !== "Available") return { already: true };
+  const state = await gh.getState();
+  if (state === "Shutdown" || state === "Archived") return { already: true };
+  if (state === "ShuttingDown") {
+    await progress("Codespace is already stopping — waiting for shutdown…");
+    await waitUntil("Codespace shutdown", async () => (await gh.getState()) === "Shutdown", cfg.codespaceTimeoutMs, progress);
+    clearTimeout(idleTimer); idleTimer = null;
+    return { stopped: true };
+  }
   if (agent.alive()) {
     try {
       const s = agent.status();
@@ -110,8 +117,9 @@ async function stopInternal(progress, enforceCooldown) {
   }
   await progress("Stopping Codespace…");
   await gh.stop();
+  await waitUntil("Codespace shutdown", async () => (await gh.getState()) === "Shutdown", cfg.codespaceTimeoutMs, progress);
   clearTimeout(idleTimer); idleTimer = null;
-  return { stopping: true };
+  return { stopped: true };
 }
 
 async function stop(progress = async () => {}) {
