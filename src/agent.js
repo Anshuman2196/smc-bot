@@ -48,8 +48,5 @@ function deop(name) { return action("deop", { name }); }
 function say(message) { return action("say", { message }); }
 function command(command) { return action("command", { command }); }
 function save() { return action("save"); }
-function seed() { return action("seed"); }
-function tps() { return action("tps"); }
-function version() { return action("version"); }
 function propertySet(key, value) { return action("property.set", { key, value }); }
-module.exports = { authenticated, connected, sync, info, status, setDesired, restart, action, waitForAction, whitelistAdd, whitelistRemove, whitelistClear, kick, ban, pardon, op, deop, say, command, save, seed, tps, version, propertySet };
+module.exports = { authenticated, connected, sync, info, status, setDesired, restart, action, waitForAction, whitelistAdd, whitelistRemove, whitelistClear, kick, ban, pardon, op, deop, say, command, save, propertySet };
