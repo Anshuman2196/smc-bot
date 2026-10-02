@@ -8,7 +8,6 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
 });
 
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const allowedChannel = id => config.allowedChannelIds.length === 0 || config.allowedChannelIds.includes(id);
 const canControl = member => {
   if (!config.adminIds.length && !config.controlRoleIds.length) return true;
@@ -61,9 +60,7 @@ async function notify(text) {
 async function handleCommand(message, parts) {
   const command = (parts[1] || "help").toLowerCase();
 
-  if (command === "status") {
-    return message.reply(statusMessage(await controller.liveStatus()));
-  }
+  if (command === "status") return message.reply(statusMessage(await controller.liveStatus()));
 
   if (command === "help") {
     return message.reply([
@@ -84,9 +81,7 @@ async function handleCommand(message, parts) {
     return message.reply(`🟡 Whitelist request queued for **${result.name}**.`);
   }
 
-  if (!["start", "stop", "restart"].includes(command)) {
-    return message.reply("Unknown command. Use `smc help`.");
-  }
+  if (!["start", "stop", "restart"].includes(command)) return message.reply("Unknown command. Use `smc help`.");
 
   const progress = await message.reply(command === "start" ? "🟡 Starting SMC…" : command === "stop" ? "🟡 Stopping SMC…" : "🟡 Restarting SMC…");
   const report = progressReporter(progress);
@@ -131,10 +126,7 @@ const server = http.createServer((request, response) => {
     return json(response, 200, { ok: true, operation: controller.operation(), agent: agent.info() });
   }
 
-  if (request.method !== "POST" || request.url !== "/agent/sync") {
-    return json(response, 404, { error: "not_found" });
-  }
-
+  if (request.method !== "POST" || request.url !== "/agent/sync") return json(response, 404, { error: "not_found" });
   if (!agent.authenticated(request)) return json(response, 401, { error: "unauthorized" });
 
   let body = "";
@@ -146,20 +138,14 @@ const server = http.createServer((request, response) => {
     try {
       const input = JSON.parse(body || "{}");
       return json(response, 200, agent.sync(input.status));
-    } catch (error) {
+    } catch {
       return json(response, 400, { error: "invalid_request" });
     }
   });
 });
 
-server.listen(config.httpPort, "0.0.0.0", () => {
-  console.log(`SMC control plane listening on ${config.httpPort}`);
-});
-
-client.once("ready", () => {
-  console.log(`Discord connected as ${client.user.tag}`);
-});
-
+server.listen(config.httpPort, "0.0.0.0", () => console.log(`SMC control plane listening on ${config.httpPort}`));
+client.once("ready", () => console.log(`Discord connected as ${client.user.tag}`));
 client.login(config.discordToken).catch(error => {
   console.error("Discord login failed:", error);
   process.exit(1);
@@ -167,5 +153,3 @@ client.login(config.discordToken).catch(error => {
 
 process.on("SIGTERM", () => server.close(() => process.exit(0)));
 process.on("SIGINT", () => server.close(() => process.exit(0)));
-
-void sleep;
