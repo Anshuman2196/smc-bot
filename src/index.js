@@ -161,11 +161,11 @@ async function handle(message, parts) {
     else if (command === "stop") result = await controller.stopServer();
     else if (command === "restart") result = await controller.restartServer();
     else if (command === "say") { const msg = parts.slice(2).join(" "); if (!msg) throw new Error("Usage: smc say <message>"); result = await controller.say(msg); }
-    else if (command === "kick") result = await controller.kick(name);
-    else if (command === "ban") result = await controller.ban(name);
-    else if (command === "pardon" || command === "unban") result = await controller.pardon(name);
-    else if (command === "op") result = await controller.op(name);
-    else if (command === "deop") result = await controller.deop(name);
+    else if (command === "kick") { if (!canAdmin(message.member)) throw new Error("Admin access required for kick."); result = await controller.kick(name); }
+    else if (command === "ban") { if (!canAdmin(message.member)) throw new Error("Admin access required for ban."); result = await controller.ban(name); }
+    else if (command === "pardon" || command === "unban") { if (!canAdmin(message.member)) throw new Error("Admin access required for unban."); result = await controller.pardon(name); }
+    else if (command === "op") { if (!canAdmin(message.member)) throw new Error("Admin access required for op."); result = await controller.op(name); }
+    else if (command === "deop") { if (!canAdmin(message.member)) throw new Error("Admin access required for deop."); result = await controller.deop(name); }
     else if (command === "save") result = await controller.save();
     else if (command === "seed") result = await controller.seed();
     else if (command === "tps") result = await controller.tps();
@@ -213,7 +213,7 @@ setInterval(async () => {
     if (s.minecraft === "running" && s.players?.online === 0) {
       if (!emptySince) emptySince = Date.now();
       const idleMs = config.idleMinutes * 60 * 1000;
-      if (idleMs > 0 && Date.now() - emptySince >= idleMs && !operation) {
+      if (idleMs > 0 && Date.now() - emptySince >= idleMs && !controller.operation()) {
         await notify(`🛌 **SMC idle shutdown:** no players for ${config.idleMinutes} minutes.`);
         try { await controller.stopServer(); } catch (error) { await notify("⚠️ Idle shutdown was blocked: " + error.message); }
         emptySince = null;
