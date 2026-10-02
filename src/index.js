@@ -42,6 +42,8 @@ const adminHelp = () => [
   "`smc admin adminrole set @role` — set the admin role",
   "`smc admin adminrole clear` — clear the admin role",
   "`smc admin adminrole list` — show the admin role",
+  "`smc admin lock` / `smc admin unlock` — lock or unlock controls",
+  "`smc admin audit` — show recent actions",
   "",
   "Changes apply immediately and last until the bot restarts."
 ].join("\\n");
