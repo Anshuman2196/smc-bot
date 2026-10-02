@@ -183,20 +183,19 @@ ${pick("stop")}`);
 ${pick("restart")}`);
       result = await controller.restartServer((text) => showState("Restarting", text));
     }
-    else if (command === "say") { const msg = parts.slice(2).join(" "); if (!msg) throw new Error("Usage: smc say <message>"); result = await controller.say(msg); }
-    else if (command === "set") { if (!canAdmin(message.member)) throw new Error("Admin access required for server.properties."); const key = parts[2]; const value = parts.slice(3).join(" "); if (!key || !value) throw new Error("Usage: smc set <property> <value>"); if (["online-mode","white-list","enforce-whitelist","server-port"].includes(key)) throw new Error("That property is protected by SMC safety rules."); result = await controller.propertySet(key, value); }
-    else if (command === "kick") { if (!canAdmin(message.member)) throw new Error("Admin access required for kick."); result = await controller.kick(name); }
-    else if (command === "ban") { if (!canAdmin(message.member)) throw new Error("Admin access required for ban."); result = await controller.ban(name); }
-    else if (command === "pardon" || command === "unban") { if (!canAdmin(message.member)) throw new Error("Admin access required for unban."); result = await controller.pardon(name); }
-    else if (command === "op") { if (!canAdmin(message.member)) throw new Error("Admin access required for op."); result = await controller.op(name); }
-    else if (command === "deop") { if (!canAdmin(message.member)) throw new Error("Admin access required for deop."); result = await controller.deop(name); }
-    else if (command === "save") result = await controller.save();
-    else if (command === "seed") result = await controller.seed();
-    else if (command === "tps") result = await controller.tps();
-    else if (command === "version") result = await controller.version();
-    else if (command === "whitelist") { const sub = (parts[2] || "list").toLowerCase(); if (sub === "add") result = await controller.whitelistAdd(parts[3]); else if (sub === "remove" || sub === "rm") result = await controller.whitelistRemove(parts[3]); else if (sub === "clear") result = await controller.whitelistClear(); else return message.reply(controller.formatWhitelist(await controller.liveStatus())); }
-    else if (command === "command") { if (!canAdmin(message.member)) return message.reply("👑 **Admin access required for arbitrary Minecraft commands.**"); const raw = parts.slice(2).join(" "); if (!raw) throw new Error("Usage: smc command <minecraft command>"); result = await controller.command(raw); }
-    else return message.reply("⚠️ Unknown command. Use `smc help`.");
+    else if (command === "say") { const msg = parts.slice(2).join(" "); if (!msg) throw new Error("Usage: smc say <message>"); working = await message.reply("🟡 **Doing**\nSending that to Minecraft…"); result = await controller.say(msg); }
+    else if (command === "set") { if (!canAdmin(message.member)) throw new Error("Admin access required for server.properties."); const key = parts[2]; const value = parts.slice(3).join(" "); if (!key || !value) throw new Error("Usage: smc set <property> <value>"); if (["online-mode","white-list","enforce-whitelist","server-port"].includes(key)) throw new Error("That property is protected by SMC safety rules."); working = await message.reply("🟡 **Doing**\nUpdating `" + key + "`…"); result = await controller.propertySet(key, value); }
+    else if (command === "kick") { if (!canAdmin(message.member)) throw new Error("Admin access required for kick."); working = await message.reply("🟡 **Doing**\nKicking `" + name + "`…"); result = await controller.kick(name); }
+    else if (command === "ban") { if (!canAdmin(message.member)) throw new Error("Admin access required for ban."); working = await message.reply("🟡 **Doing**\nBanning `" + name + "`…"); result = await controller.ban(name); }
+    else if (command === "pardon" || command === "unban") { if (!canAdmin(message.member)) throw new Error("Admin access required for unban."); working = await message.reply("🟡 **Doing**\nRemoving the ban for `" + name + "`…"); result = await controller.pardon(name); }
+    else if (command === "op") { if (!canAdmin(message.member)) throw new Error("Admin access required for op."); working = await message.reply("🟡 **Doing**\nGiving `" + name + "` operator access…"); result = await controller.op(name); }
+    else if (command === "deop") { if (!canAdmin(message.member)) throw new Error("Admin access required for deop."); working = await message.reply("🟡 **Doing**\nRemoving operator access from `" + name + "`…"); result = await controller.deop(name); }
+    else if (command === "save") { working = await message.reply("🟡 **Doing**\nSaving the world…"); result = await controller.save(); }
+    else if (command === "seed") { working = await message.reply("🟡 **Doing**\nReading the world seed…"); result = await controller.seed(); }
+    else if (command === "tps") { working = await message.reply("🟡 **Doing**\nChecking server TPS…"); result = await controller.tps(); }
+    else if (command === "version") { working = await message.reply("🟡 **Doing**\nChecking the Minecraft version…"); result = await controller.version(); }
+    else if (command === "whitelist") { const sub = (parts[2] || "list").toLowerCase(); if (sub === "add") { working = await message.reply("🟡 **Doing**\nAdding `" + parts[3] + "` to the whitelist file…"); result = await controller.whitelistAdd(parts[3]); } else if (sub === "remove" || sub === "rm") { working = await message.reply("🟡 **Doing**\nRemoving `" + parts[3] + "` from the whitelist file…"); result = await controller.whitelistRemove(parts[3]); } else if (sub === "clear") { working = await message.reply("🟡 **Doing**\nClearing the whitelist file…"); result = await controller.whitelistClear(); } else return message.reply(controller.formatWhitelist(await controller.liveStatus())); }
+    else if (command === "command") { if (!canAdmin(message.member)) return message.reply("👑 **Admin access required for arbitrary Minecraft commands.**"); const raw = parts.slice(2).join(" "); if (!raw) throw new Error("Usage: smc command <minecraft command>"); working = await message.reply("🟡 **Doing**\nRunning `" + raw + "`…"); result = await controller.command(raw); }
 
     record(message, parts.slice(1).join(" "), "completed");
 
@@ -214,9 +213,8 @@ ${format(result)}`);
 
     if (command === "version") {
       const output = Array.isArray(result?.output) ? result.output.filter(Boolean).slice(-8).join("\n") : "";
-      return message.reply(output ? `🧩 **Minecraft version**\n\`\`\`\n${output}\n\`\`\`` : "⚠️ **Minecraft version**\nMinecraft did not return a version line.");
+      return working.edit(output ? `🧩 **Minecraft version**\n\`\`\`\n${output}\n\`\`\`` : "⚠️ **Minecraft version**\nMinecraft did not return a version line.").catch(() => {});
     }
-
     return message.reply(`✅ **Done** — ${parts.slice(1).join(" ")} completed.`);
   } catch (error) { record(message, parts.slice(1).join(" "), "error"); return message.reply(`⚠️ **SMC couldn’t complete that.**\n\`${String(error.message || error).replace(/\`/g, "'")}\``); }
 }
