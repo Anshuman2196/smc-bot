@@ -211,12 +211,15 @@ ${pick("online")}
 ${format(result)}`);
     }
 
-    if (command === "version") {
-      const output = Array.isArray(result?.output) ? result.output.filter(Boolean).slice(-8).join("\n") : "";
-      return working.edit(output ? `🟢 **Done**\\n🧩 **Minecraft version**\\n\\`\\`\\`\\n${output}\\n\\`\\`\\`` : "⚠️ **Done**\\nMinecraft did not return any output from `/version`.").catch(() => {});
-    }
-
     if (working) {
+      const output = Array.isArray(result?.output)
+        ? result.output.filter(Boolean).slice(-12).join("\n").replace(/\x60/g, "'").slice(-3000)
+        : "";
+
+      if (output) {
+        return working.edit(`🟢 **Done**\\n\\`\\`\\`\\n${output}\\n\\`\\`\\``).catch(() => {});
+      }
+
       const label = command === "set" ? `Updated \\`${parts[2]}\\`` :
         command === "kick" ? `Kicked \\`${parts[2]}\\`` :
         command === "ban" ? `Banned \\`${parts[2]}\\`` :
@@ -224,12 +227,14 @@ ${format(result)}`);
         command === "op" ? `Gave \\`${parts[2]}\\` operator access` :
         command === "deop" ? `Removed operator access from \\`${parts[2]}\\`` :
         command === "save" ? "World saved" :
-        command === "seed" ? "World seed read" :
-        command === "tps" ? "TPS checked" :
+        command === "seed" ? "World seed command completed" :
+        command === "tps" ? "TPS command completed" :
         command === "say" ? "Message sent" :
         command === "whitelist" ? "Whitelist updated" :
         command === "command" ? "Minecraft command completed" :
+        command === "version" ? "Version command completed" :
         "Action completed";
+
       return working.edit(`🟢 **Done**\\n${label}.`).catch(() => {});
     }
 
