@@ -150,6 +150,7 @@ async function handle(message, parts) {
   if (command === "status") return message.reply(format(await controller.liveStatus()));
   if (command === "health") return message.reply(controller.formatHealth(await controller.liveStatus()));
   if (command === "logs") return message.reply(controller.formatLogs(await controller.liveStatus()));
+  if (command === "properties" || command === "props") return message.reply(controller.formatProperties(await controller.liveStatus()));
   if (command === "address") return message.reply(controller.formatAddress(await controller.liveStatus()));
   if (command === "online") return message.reply(controller.formatOnline(await controller.liveStatus()));
   if (command === "whitelist" && !["add", "remove", "rm", "clear"].includes((parts[2] || "").toLowerCase())) return message.reply(controller.formatWhitelist(await controller.liveStatus()));
@@ -162,7 +163,7 @@ async function handle(message, parts) {
     if (command === "start") result = await controller.startServer();
     else if (command === "stop") result = await controller.stopServer();
     else if (command === "restart") result = await controller.restartServer();
-    else if (command === "say") { const msg = parts.slice(2).join(" "); if (!msg) throw new Error("Usage: smc say <message>"); result = await controller.say(msg); }
+    else if (command === "say") { const msg = parts.slice(2).join(" "); if (!msg) throw new Error("Usage: smc say <message>"); result = await controller.say(msg); }\n    else if (command === "set") { if (!canAdmin(message.member)) throw new Error("Admin access required for server.properties."); const key = parts[2]; const value = parts.slice(3).join(" "); if (!key || !value) throw new Error("Usage: smc set <property> <value>"); if (["online-mode","white-list","enforce-whitelist","server-port"].includes(key)) throw new Error("That property is protected by SMC safety rules."); result = await controller.propertySet(key, value); }
     else if (command === "kick") { if (!canAdmin(message.member)) throw new Error("Admin access required for kick."); result = await controller.kick(name); }
     else if (command === "ban") { if (!canAdmin(message.member)) throw new Error("Admin access required for ban."); result = await controller.ban(name); }
     else if (command === "pardon" || command === "unban") { if (!canAdmin(message.member)) throw new Error("Admin access required for unban."); result = await controller.pardon(name); }
