@@ -220,12 +220,12 @@ ${format(result)}`);
         return working.edit("🟢 **Done**\n```\n" + output + "\n```").catch(() => {});
       }
 
-      const label = command === "set" ? `Updated `${parts[2]}`` :
-        command === "kick" ? `Kicked `${parts[2]}`` :
-        command === "ban" ? `Banned `${parts[2]}`` :
-        (command === "pardon" || command === "unban") ? `Ban removed for `${parts[2]}`` :
-        command === "op" ? `Gave `${parts[2]}` operator access` :
-        command === "deop" ? `Removed operator access from `${parts[2]}`` :
+      const label = command === "set" ? "Updated " + parts[2] :
+        command === "kick" ? "Kicked " + parts[2] :
+        command === "ban" ? "Banned " + parts[2] :
+        (command === "pardon" || command === "unban") ? "Ban removed for " + parts[2] :
+        command === "op" ? "Gave " + parts[2] + " operator access" :
+        command === "deop" ? "Removed operator access from " + parts[2] :
         command === "save" ? "World saved" :
         command === "seed" ? "World seed command completed" :
         command === "tps" ? "TPS command completed" :
