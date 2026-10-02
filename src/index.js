@@ -150,6 +150,7 @@ async function handle(message, parts) {
   if (command === "status") return message.reply(format(await controller.liveStatus()));
   if (command === "health") return message.reply(controller.formatHealth(await controller.liveStatus()));
   if (command === "logs") return message.reply(controller.formatLogs(await controller.liveStatus()));
+  if (command === "crash") return message.reply(controller.formatCrash(await controller.liveStatus()));
   if (command === "properties" || command === "props") return message.reply(controller.formatProperties(await controller.liveStatus()));
   if (command === "address") return message.reply(controller.formatAddress(await controller.liveStatus()));
   if (command === "online") return message.reply(controller.formatOnline(await controller.liveStatus()));
