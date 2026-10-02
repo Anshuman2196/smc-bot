@@ -1,53 +1,93 @@
-const cfg = require("./config");
-const queue = [];
-const pending = new Map();
-let lastSeen = 0;
-let lastStatus = null;
-let lastPlayers = null;
-let sequence = 0;
-function heartbeat(status) {
-  lastSeen = Date.now();
-  if (status && typeof status === "object") lastStatus = status;
-}
-function alive() { return lastSeen > 0 && Date.now() - lastSeen <= cfg.agentStaleMs; }
-function enqueue(type, args = {}, timeout = cfg.commandTimeoutMs, onProgress = null) {
-  if (!alive()) throw new Error("SMC agent is offline");
-  if (pending.size || queue.length) throw new Error("SMC is busy with another operation");
-  const id = `${Date.now()}-${++sequence}`;
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { pending.delete(id); reject(new Error(`SMC agent timed out while running ${type}`)); }, timeout);
-    pending.set(id, { type, timer, resolve, reject, onProgress });
-    queue.push({ id, type, args });
-  });
-}
-function poll(status) { heartbeat(status); return queue.shift() || {}; }
-function result(payload) {
-  heartbeat(payload?.status);
-  const job = pending.get(payload?.id);
-  if (!job) return false;
-  pending.delete(payload.id); clearTimeout(job.timer);
-  if (payload.ok) job.resolve(payload.data || {}); else job.reject(new Error(payload.error || `${job.type} failed`));
-  return true;
-}
-function progress(payload) {
-  heartbeat(payload?.status || payload?.data?.status);
-  const job = pending.get(payload?.id);
-  if (!job) return false;
-  if (typeof job.onProgress === "function") job.onProgress(String(payload.message || "Working…"), payload.data || null);
-  return true;
-}
-function auth(req) { return req.headers.authorization === `Bearer ${cfg.agentToken}`; }
-function info() { return { online: alive(), lastSeen, ageMs: lastSeen ? Date.now() - lastSeen : null, queued: queue.length, pending: pending.size, status: lastStatus }; }
-function status() {
-  if (!alive()) throw new Error("SMC agent is offline");
-  return { ...(lastStatus || { minecraft: "unknown", playit: "unknown" }), players: lastPlayers?.online ?? null, maxPlayers: lastPlayers?.max ?? lastStatus?.maxPlayers ?? null };
-}
-function rememberPlayers(value) { if (value && Number.isFinite(value.online)) lastPlayers = value; }
-module.exports = {
-  auth, poll, result, progress, heartbeat, alive, info, status,
-  start: onProgress => enqueue("minecraft.start", {}, cfg.startTimeoutMs, onProgress),
-  stop: onProgress => enqueue("minecraft.stop", {}, cfg.stopTimeoutMs, onProgress),
-  restart: onProgress => enqueue("minecraft.restart", {}, cfg.startTimeoutMs + cfg.stopTimeoutMs, onProgress),
-  players: async () => { const value = await enqueue("players", {}, cfg.commandTimeoutMs); rememberPlayers(value); return value; },
-  whitelistAdd: name => enqueue("whitelist.add", { name }, cfg.commandTimeoutMs)
+const config = require("./config");
+
+const HEARTBEAT_WINDOW = Math.max(config.agentStaleMs, config.pollWaitMs * 2);
+
+let snapshot = {
+  minecraft: "unknown",
+  playit: "unknown",
+  minecraftPort: false,
+  players: null,
+  maxPlayers: null,
+  uptimeSec: null,
+  lastExit: null,
+  logTail: []
 };
+let seenAt = 0;
+let desiredMinecraft = "unknown";
+let restartGeneration = 0;
+let actionSequence = 0;
+const actions = new Map();
+
+function authenticated(request) {
+  return request.headers.authorization === `Bearer ${config.agentToken}`;
+}
+
+function connected() {
+  return seenAt > 0 && Date.now() - seenAt <= HEARTBEAT_WINDOW;
+}
+
+function update(status) {
+  seenAt = Date.now();
+  if (status && typeof status === "object") snapshot = { ...snapshot, ...status };
+  if (desiredMinecraft === "unknown") {
+    desiredMinecraft = ["running", "starting", "stopping"].includes(snapshot.minecraft) ? "running" : "stopped";
+  }
+}
+
+function requestStart() {
+  desiredMinecraft = "running";
+}
+
+function requestStop() {
+  desiredMinecraft = "stopped";
+}
+
+function requestRestart() {
+  desiredMinecraft = "running";
+  restartGeneration += 1;
+  return restartGeneration;
+}
+
+function queueAction(type, args = {}) {
+  const id = `${Date.now()}-${++actionSequence}`;
+  actions.set(id, { id, type, args, createdAt: Date.now() });
+  return id;
+}
+
+function takeAction() {
+  const first = actions.values().next();
+  if (first.done) return null;
+  actions.delete(first.value.id);
+  return first.value;
+}
+
+function sync(status) {
+  update(status);
+  return { desiredMinecraft, restartGeneration, action: takeAction() };
+}
+
+function info() {
+  return {
+    connected: connected(),
+    seenAt,
+    ageMs: seenAt ? Date.now() - seenAt : null,
+    desiredMinecraft,
+    restartGeneration,
+    snapshot
+  };
+}
+
+function status() {
+  if (!connected()) throw new Error("SMC agent is offline");
+  return snapshot;
+}
+
+function whitelistAdd(name) {
+  if (!connected()) throw new Error("SMC agent is offline");
+  if (snapshot.minecraft !== "running") throw new Error("Minecraft is not running");
+  if (!/^[A-Za-z0-9_]{3,16}$/.test(name)) throw new Error("Invalid Minecraft username");
+  const id = queueAction("whitelist.add", { name });
+  return { id, name };
+}
+
+module.exports = { authenticated, connected, sync, info, status, requestStart, requestStop, requestRestart, whitelistAdd };

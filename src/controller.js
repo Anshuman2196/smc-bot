@@ -1,147 +1,192 @@
-const cfg = require("./config");
-const gh = require("./github");
+const config = require("./config");
+const github = require("./github");
 const agent = require("./agent");
 
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-let busy = null;
-let lastActionAt = 0;
+let operation = null;
+let lastCommandAt = 0;
 let idleTimer = null;
 
-function cooldown() {
-  const remaining = cfg.actionCooldownMs - (Date.now() - lastActionAt);
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+function assertCooldown() {
+  const remaining = config.actionCooldownMs - (Date.now() - lastCommandAt);
   if (remaining > 0) throw new Error(`Please wait ${Math.ceil(remaining / 1000)}s before another SMC action.`);
-  lastActionAt = Date.now();
+  lastCommandAt = Date.now();
 }
 
-async function waitUntil(label, predicate, timeout, progress, interval = 1500) {
+async function waitFor(label, predicate, timeout, report, interval = 1500) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     if (await predicate()) return;
-    await progress(`${label}…`);
+    await report(label);
     await sleep(interval);
   }
-  throw new Error(`Timed out: ${label}`);
+  throw new Error(`Timed out waiting for ${label}.`);
 }
 
-async function ensureCodespace(progress) {
-  let state = await gh.getState();
+async function codespaceReady(report) {
+  let state = await github.state();
+
   if (state === "ShuttingDown") {
-    await progress("Codespace is shutting down — waiting for it to finish…");
-    await waitUntil("Codespace shutdown", async () => (await gh.getState()) === "Shutdown", cfg.codespaceTimeoutMs, progress);
-    state = "Shutdown";
+    await report("Codespace is finishing its previous shutdown…");
+    await waitFor("Codespace shutdown", async () => {
+      state = await github.state();
+      return state === "Shutdown" || state === "Archived";
+    }, config.codespaceTimeoutMs, report, 2000);
   }
+
   if (state === "Shutdown" || state === "Archived") {
-    await progress("Starting Codespace…");
-    await gh.start();
-  } else if (state === "Available") {
-    await progress("Codespace already online — waiting for SMC agent heartbeat…");
-  } else {
-    await progress(`Codespace state: ${state} — waiting…`);
+    await report("Starting Codespace…");
+    await github.start();
   }
-  await waitUntil("Codespace", async () => (await gh.getState()) === "Available", cfg.codespaceTimeoutMs, progress);
+
+  await waitFor("Codespace", async () => (await github.state()) === "Available", config.codespaceTimeoutMs, report, 2000);
 }
 
-async function waitForAgent(progress) {
-  await waitUntil("SMC agent connection", () => agent.alive(), 180000, async () => {
+async function agentReady(report) {
+  await waitFor("SMC agent", () => agent.connected(), config.startTimeoutMs, async () => {
     const info = agent.info();
-    await progress(info.lastSeen ? `SMC agent heartbeat age: ${Math.round(info.ageMs / 1000)}s` : "Waiting for SMC agent heartbeat…");
+    await report(info.ageMs == null ? "Waiting for the SMC agent…" : `Agent heartbeat: ${Math.round(info.ageMs / 1000)}s ago`);
   }, 1500);
 }
 
-async function statusSnapshot() {
-  const out = { codespace: "offline", agent: "offline", minecraft: "offline", playit: "offline", players: null, max: null, uptimeSec: null, errors: [] };
+async function liveStatus() {
+  const result = {
+    codespace: "offline",
+    agent: "offline",
+    minecraft: "offline",
+    playit: "offline",
+    players: null,
+    maxPlayers: null,
+    uptimeSec: null,
+    logTail: [],
+    error: null
+  };
+
   try {
-    const state = await gh.getState();
-    out.codespace = state === "Available" ? "online" : state === "ShuttingDown" ? "stopping" : "offline";
-  } catch (e) { out.errors.push(e.message); return out; }
-  if (out.codespace !== "online") return out;
-  if (!agent.alive()) { out.errors.push("SMC agent is offline"); return out; }
-  out.agent = "online";
+    const state = await github.state();
+    result.codespace = state === "Available" ? "online" : state === "ShuttingDown" ? "stopping" : "offline";
+  } catch (error) {
+    result.error = error.message;
+    return result;
+  }
+
+  if (result.codespace !== "online") return result;
+  if (!agent.connected()) return result;
+
+  result.agent = "online";
   try {
-    const s = agent.status();
-    out.minecraft = s.minecraft || "unknown";
-    out.playit = s.playit || "unknown";
-    out.players = s.players ?? null;
-    out.max = s.maxPlayers ?? null;
-    out.uptimeSec = s.uptimeSec ?? null;
-  } catch (e) { out.errors.push(e.message); }
-  return out;
+    const status = agent.status();
+    result.minecraft = status.minecraft || "unknown";
+    result.playit = status.playit || "unknown";
+    result.players = status.players?.online ?? null;
+    result.maxPlayers = status.players?.max ?? status.maxPlayers ?? null;
+    result.uptimeSec = status.uptimeSec ?? null;
+    result.logTail = status.logTail || [];
+  } catch (error) {
+    result.error = error.message;
+  }
+  return result;
 }
 
-function scheduleIdleShutdown() {
-  clearTimeout(idleTimer);
-  if (cfg.idleMinutes <= 0) return;
+function clearIdleTimer() {
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = null;
+}
+
+function armIdleTimer() {
+  clearIdleTimer();
+  if (config.idleMinutes <= 0) return;
   idleTimer = setTimeout(async () => {
+    idleTimer = null;
+    if (operation) return armIdleTimer();
     try {
-      if (busy || (await gh.getState()) !== "Available" || !agent.alive()) return scheduleIdleShutdown();
-      const s = agent.status();
-      if (s.minecraft !== "running") return scheduleIdleShutdown();
-      const p = await agent.players();
-      if (p.online > 0) return scheduleIdleShutdown();
-      await stopInternal(async () => {}, false);
-    } catch { scheduleIdleShutdown(); }
-  }, cfg.idleMinutes * 60000);
+      if (!agent.connected()) return armIdleTimer();
+      const status = agent.status();
+      if (status.minecraft !== "running" || (status.players?.online || 0) > 0) return armIdleTimer();
+      await stopServer(async () => {}, false);
+    } catch {
+      armIdleTimer();
+    }
+  }, config.idleMinutes * 60000);
 }
 
-async function start(progress = async () => {}) {
-  if (busy) throw new Error(`SMC is already busy: ${busy}`);
-  cooldown(); busy = "start";
+async function startServer(report = async () => {}, useCooldown = true) {
+  if (operation) throw new Error(`SMC is already ${operation}.`);
+  if (useCooldown) assertCooldown();
+  operation = "starting";
   try {
-    await ensureCodespace(progress);
-    await waitForAgent(progress);
-    const s = agent.status();
-    if (s.minecraft === "running") return statusSnapshot();
-    await progress("Sending Minecraft start command to the Codespace agent…");
-    await agent.start(progress);
-    await progress("Minecraft is ready. Finalizing status…");
-    scheduleIdleShutdown();
-    return statusSnapshot();
-  } finally { busy = null; }
+    await codespaceReady(report);
+    await agentReady(report);
+    const status = agent.status();
+    if (status.minecraft !== "running") {
+      agent.requestStart();
+      await report("Minecraft desired state is RUNNING. Waiting for reconciliation…");
+      await waitFor("Minecraft", () => agent.connected() && agent.status().minecraft === "running", config.startTimeoutMs, report, 2000);
+    }
+    armIdleTimer();
+    return liveStatus();
+  } finally {
+    operation = null;
+  }
 }
 
-async function stopInternal(progress, enforceCooldown) {
-  if (enforceCooldown) cooldown();
-  const state = await gh.getState();
-  if (state === "Shutdown" || state === "Archived") return { already: true };
-  if (state === "ShuttingDown") {
-    await progress("Codespace is already stopping — waiting for shutdown…");
-    await waitUntil("Codespace shutdown", async () => (await gh.getState()) === "Shutdown", cfg.codespaceTimeoutMs, progress);
-    clearTimeout(idleTimer); idleTimer = null;
+async function stopServer(report = async () => {}, useCooldown = true) {
+  if (operation) throw new Error(`SMC is already ${operation}.`);
+  if (useCooldown) assertCooldown();
+  operation = "stopping";
+  clearIdleTimer();
+  try {
+    let state = await github.state();
+    if (state === "Shutdown" || state === "Archived") return { stopped: true };
+
+    if (agent.connected()) {
+      agent.requestStop();
+      await report("Minecraft desired state is STOPPED. Waiting for the server to exit…");
+      try {
+        await waitFor("Minecraft shutdown", () => {
+          if (!agent.connected()) return true;
+          return ["stopped", "unknown"].includes(agent.status().minecraft);
+        }, config.stopTimeoutMs, report, 1000);
+      } catch (error) {
+        await report(`Minecraft did not stop within the graceful window: ${error.message}`);
+      }
+    } else {
+      await report("Agent is offline. Skipping directly to Codespace shutdown.");
+    }
+
+    await report("Stopping Codespace…");
+    await github.stop();
+    await waitFor("Codespace shutdown", async () => {
+      state = await github.state();
+      return state === "Shutdown" || state === "Archived";
+    }, config.codespaceTimeoutMs, report, 2000);
+
     return { stopped: true };
+  } finally {
+    operation = null;
   }
-  if (agent.alive()) {
-    try {
-      const s = agent.status();
-      if (s.minecraft !== "stopped") await agent.stop(progress);
-    } catch (e) { await progress(`Agent stop warning: ${e.message}`); }
-  }
-  await progress("Stopping Codespace…");
-  await gh.stop();
-  await waitUntil("Codespace shutdown", async () => (await gh.getState()) === "Shutdown", cfg.codespaceTimeoutMs, progress);
-  clearTimeout(idleTimer); idleTimer = null;
-  return { stopped: true };
 }
 
-async function stop(progress = async () => {}) {
-  if (busy) throw new Error(`SMC is already busy: ${busy}`);
-  busy = "stop";
-  try { return await stopInternal(progress, true); }
-  finally { busy = null; }
-}
-
-async function restart(progress = async () => {}) {
-  if (busy) throw new Error(`SMC is already busy: ${busy}`);
-  cooldown(); busy = "restart";
+async function restartServer(report = async () => {}) {
+  if (operation) throw new Error(`SMC is already ${operation}.`);
+  assertCooldown();
+  operation = "restarting";
   try {
-    await ensureCodespace(progress);
-    await waitForAgent(progress);
-    const s = agent.status();
-    if (s.minecraft !== "stopped") { await progress("Stopping Minecraft…"); await agent.stop(progress); }
-    await progress("Minecraft stopped. Starting a clean instance…");
-    await agent.start(progress);
-    scheduleIdleShutdown();
-    return statusSnapshot();
-  } finally { busy = null; }
+    await codespaceReady(report);
+    await agentReady(report);
+    agent.requestRestart();
+    await report("Restart requested. Reconciler is replacing the Minecraft process…");
+    await waitFor("Minecraft restart", () => agent.connected() && agent.status().minecraft === "running", config.startTimeoutMs, report, 2000);
+    armIdleTimer();
+    return liveStatus();
+  } finally {
+    operation = null;
+  }
 }
 
-module.exports = { statusSnapshot, startServer: start, stopServer: stop, restartServer: restart, whitelistAdd: agent.whitelistAdd, isBusy: () => busy };
+function whitelistAdd(name) {
+  return agent.whitelistAdd(name);
+}
+
+module.exports = { liveStatus, startServer, stopServer, restartServer, whitelistAdd, operation: () => operation };
