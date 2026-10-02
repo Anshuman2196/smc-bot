@@ -239,7 +239,12 @@ ${format(result)}`);
     }
 
     return message.reply(`🟢 **Done** — ${parts.slice(1).join(" ")} completed.`);
-  } catch (error) { record(message, parts.slice(1).join(" "), "error"); return message.reply(`⚠️ **SMC couldn’t complete that.**\n\`${String(error.message || error).replace(/\`/g, "'")}\``); }
+  } catch (error) {
+    record(message, parts.slice(1).join(" "), "error");
+    const errorText = String(error.message || error).replace(/\\`/g, "'");
+    if (working) return working.edit("🔴 **Failed**\n" + errorText).catch(() => {});
+    return message.reply("⚠️ **SMC couldn’t complete that.**\n\\`" + errorText + "\\`");
+  }
 }
 client.on("messageCreate", async message => {
   if (message.author.bot || !message.guild) return;
