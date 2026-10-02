@@ -61,12 +61,9 @@ async function statusSnapshot() {
     const s = agent.status();
     out.minecraft = s.minecraft || "unknown";
     out.playit = s.playit || "unknown";
+    out.players = s.players ?? null;
     out.max = s.maxPlayers ?? null;
     out.uptimeSec = s.uptimeSec ?? null;
-    if (out.minecraft === "running") {
-      try { const p = await agent.players(); out.players = p.online; out.max = p.max; }
-      catch (e) { out.errors.push(`Players: ${e.message}`); }
-    }
   } catch (e) { out.errors.push(e.message); }
   return out;
 }
@@ -93,10 +90,10 @@ async function start(progress = async () => {}) {
     await ensureCodespace(progress);
     await waitForAgent(progress);
     const s = agent.status();
-    if (s.minecraft === "running" && s.playit === "connected") return statusSnapshot();
+    if (s.minecraft === "running") return statusSnapshot();
     await progress("Sending Minecraft start command to the Codespace agent…");
     await agent.start(progress);
-    await progress("Minecraft and Playit are ready. Finalizing status…");
+    await progress("Minecraft is ready. Finalizing status…");
     scheduleIdleShutdown();
     return statusSnapshot();
   } finally { busy = null; }
@@ -139,11 +136,4 @@ async function restart(progress = async () => {}) {
   } finally { busy = null; }
 }
 
-module.exports = {
-  statusSnapshot,
-  startServer: start,
-  stopServer: stop,
-  restartServer: restart,
-  whitelistAdd: agent.whitelistAdd,
-  isBusy: () => busy
-};
+module.exports = { statusSnapshot, startServer: start, stopServer: stop, restartServer: restart, whitelistAdd: agent.whitelistAdd, isBusy: () => busy };
