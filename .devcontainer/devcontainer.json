@@ -1,1 +1,0 @@
-{"name":"SMC","postStartCommand":"nohup /workspaces/smc/.devcontainer/start-smc-agent.sh >/tmp/smc-supervisor.log 2>&1 &"}
