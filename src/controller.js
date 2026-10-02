@@ -26,12 +26,12 @@ async function ensureAgent(report) {
   }, 1500);
 }
 async function liveStatus() {
-  const result = { codespace: "offline", agent: "offline", minecraft: "offline", playit: "offline", publicAddress: null, players: null, maxPlayers: null, uptimeSec: null, error: null };
+  const result = { codespace: "offline", agent: "offline", minecraft: "offline", playit: "offline", publicAddress: null, players: null, maxPlayers: null, uptimeSec: null, whitelist: [], error: null };
   try { const s = await github.state(); result.codespace = s === "Available" ? "online" : s === "ShuttingDown" ? "stopping" : "offline"; } catch (e) { result.error = e.message; return result; }
   if (result.codespace !== "online") return result;
   if (!agent.connected()) return result;
   result.agent = "online";
-  try { const s = agent.status(); Object.assign(result, { minecraft: s.minecraft || "unknown", playit: s.playit || "unknown", publicAddress: s.publicAddress || null, players: s.players?.online ?? null, maxPlayers: s.players?.max ?? s.maxPlayers ?? null, uptimeSec: s.uptimeSec ?? null }); } catch (e) { result.error = e.message; }
+  try { const s = agent.status(); Object.assign(result, { minecraft: s.minecraft || "unknown", playit: s.playit || "unknown", publicAddress: s.publicAddress || null, players: s.players?.online ?? null, maxPlayers: s.players?.max ?? s.maxPlayers ?? null, uptimeSec: s.uptimeSec ?? null, whitelist: Array.isArray(s.whitelist) ? s.whitelist : [] }); } catch (e) { result.error = e.message; }
   return result;
 }
 async function startServer(report = async () => {}) {
