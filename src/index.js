@@ -61,6 +61,10 @@ async function handleAdmin(message, parts) {
       "Admin roles: " + (adminState.adminRoleIds.length ? adminState.adminRoleIds.map(id => `<@&${id}>`).join(", ") : "None configured"));
   }
 
+  if (target === "lock") { locked = true; return message.reply("🔒 **SMC controls locked.**"); }
+  if (target === "unlock") { locked = false; return message.reply("🔓 **SMC controls unlocked.**"); }
+  if (target === "audit") { return message.reply("🧾 **Recent SMC audit**\n" + (audit.length ? audit.slice(0, 20).map(x => `• ${x.at} — ${x.user} — ${x.action} — ${x.result}`).join("\n") : "No actions recorded.")); }
+
   if (target === "channel") {
     if (action === "list") return message.reply("📍 **Allowed channels**\\n" + (adminState.allowedChannelIds.length ? adminState.allowedChannelIds.map(id => `<#${id}>`).join("\\n") : "All channels"));
     if (!ref) return message.reply("⚠️ Mention a channel.");
@@ -146,7 +150,7 @@ async function handle(message, parts) {
   if (command === "logs") return message.reply(controller.formatLogs(await controller.liveStatus()));
   if (command === "address") return message.reply(controller.formatAddress(await controller.liveStatus()));
   if (command === "online") return message.reply(controller.formatOnline(await controller.liveStatus()));
-  if (command === "whitelist") return message.reply(controller.formatWhitelist(await controller.liveStatus()));
+  if (command === "whitelist" && !["add", "remove", "rm", "clear"].includes((parts[2] || "").toLowerCase())) return message.reply(controller.formatWhitelist(await controller.liveStatus()));
   if (command === "help") return message.reply(["**SMC command deck**", pick("help"), "`smc start` — start Minecraft", "`smc stop` — stop only when empty", "`smc restart` — restart Minecraft", "`smc status` — live status", "`smc health` — health snapshot", "`smc online` — players online", "`smc address` — live Playit address", "`smc logs` — recent Minecraft log", "`smc say <message>` — announce in Minecraft", "`smc kick <player>` — kick a player", "`smc ban <player>` / `smc pardon <player>` — ban controls", "`smc op <player>` / `smc deop <player>` — operator controls", "`smc whitelist` / `smc whitelist add/remove/clear` — whitelist file controls (enforcement stays OFF)", "`smc save`, `smc seed`, `smc tps`, `smc version` — server tools", "`smc admin` — permissions, lock, audit and admin controls"].join("\n"));
   if (!canControl(message.member)) return message.reply("🔒 **Control access required.**\nYou need the configured SMC control role or admin role.");
   if (locked) return message.reply("🔒 **SMC controls are locked.**\nAn admin must use `smc admin unlock`.");
