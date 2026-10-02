@@ -119,7 +119,7 @@ module.exports = {
   kick: name => minecraftAction(agent.kick, [name]), ban: name => minecraftAction(agent.ban, [name]), pardon: name => minecraftAction(agent.pardon, [name]),
   op: name => minecraftAction(agent.op, [name]), deop: name => minecraftAction(agent.deop, [name]),
   whitelistAdd: name => minecraftAction(agent.whitelistAdd, [name]), whitelistRemove: name => minecraftAction(agent.whitelistRemove, [name]), whitelistClear: () => minecraftAction(agent.whitelistClear),
-  say: message => minecraftAction(agent.say, [message]), save: () => minecraftAction(agent.save), seed: () => minecraftAction(agent.seed), tps: () => minecraftAction(agent.tps), version: () => minecraftAction(agent.version),
+  say: message => minecraftAction(agent.say, [message]), save: () => minecraftAction(agent.save),
   command: command => minecraftAction(agent.command, [command]),
   propertySet: (key, value) => minecraftAction(agent.propertySet, [key, value]),
   formatProperties: s => { const p=s.serverProperties||{}; const keys=["motd","difficulty","gamemode","max-players","view-distance","simulation-distance","pvp","allow-flight","spawn-protection","online-mode","white-list","enforce-whitelist","server-port"]; return "⚙️ **server.properties**\\n```\\n"+keys.map(k=>k+"="+(p[k] ?? "(unset)")).join("\\n")+"\\n```"; }
