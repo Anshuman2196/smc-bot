@@ -67,6 +67,12 @@ async function stopServer(report = async () => {}) {
 async function restartServer(report = async () => {}) {
   if (operation) throw new Error(`SMC is already ${operation}.`); cooldown(); operation = "restarting";
   try {
+    if ((await github.state()) === "Available" && agent.connected()) {
+      const current = agent.status();
+      const online = current.players?.online;
+      if (online == null) throw new Error("I can’t verify the player count yet. Try again in a few seconds.");
+      if (online > 0) throw new Error(`The server has ${online} player${online === 1 ? "" : "s"} online. Safe restart waits until everyone leaves.`);
+    }
     agent.setDesired("running");
     await ensureCodespace(report);
     await ensureAgent(report);
