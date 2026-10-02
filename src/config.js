@@ -11,6 +11,6 @@ module.exports={
  notifyChannelId:process.env.NOTIFY_CHANNEL_ID||null,allowedChannelIds:list('ALLOWED_CHANNEL_IDS'),adminIds:list('ADMIN_USER_IDS'),controlRoleIds:list('CONTROL_ROLE_IDS'),
  idleMinutes:num('IDLE_SHUTDOWN_MINUTES',5),httpPort:num('PORT',10000),
  commandTimeoutMs:num('AGENT_COMMAND_TIMEOUT_MS',90000),statusTimeoutMs:num('AGENT_STATUS_TIMEOUT_MS',30000),agentStaleMs:num('AGENT_STALE_MS',120000),
- startTimeoutMs:num('AGENT_START_TIMEOUT_MS',180000),stopTimeoutMs:num('AGENT_STOP_TIMEOUT_MS',30000),
+ startTimeoutMs:num('AGENT_START_TIMEOUT_MS',480000),stopTimeoutMs:num('AGENT_STOP_TIMEOUT_MS',30000),
  actionCooldownMs:num('ACTION_COOLDOWN_MS',15000),codespaceTimeoutMs:num('CODESPACE_TIMEOUT_MS',900000)
 };
