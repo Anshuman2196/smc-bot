@@ -87,4 +87,25 @@ function formatWhitelist(s) {
   if (!list.length) return "📋 **Whitelist is empty.**\nWhitelist enforcement is currently **OFF**.";
   return `📋 **Whitelisted players (${list.length})**\n${list.map(x=>`• ${x}`).join("\n")}\n\nWhitelist enforcement is currently **OFF**.`;
 }
-module.exports = { liveStatus, startServer, stopServer, restartServer, formatOnline, formatWhitelist, operation: () => operation };
+async function requireLive() {
+  const s = await liveStatus();
+  if (s.agent !== "online") throw new Error("SMC agent is offline.");
+  if (s.minecraft !== "running") throw new Error("Minecraft is not running.");
+  return s;
+}
+async function minecraftAction(fn, args) { await requireLive(); return fn(...(args || [])); }
+function formatHealth(s) {
+  const p = s.players;
+  return ["**SMC health**", `Codespace: **${s.codespace}**`, `Agent: **${s.agent}**`, `Minecraft: **${s.minecraft}**`, `Playit: **${s.playit}**`, `Port: **${s.minecraftPort ? "open" : "closed"}**`, `Players: **${p?.online ?? "—"}/${p?.max ?? s.maxPlayers ?? "—"}**`, `Uptime: **${s.uptimeSec == null ? "—" : Math.floor(s.uptimeSec / 60) + "m " + s.uptimeSec % 60 + "s"}**`, `Address: **${s.publicAddress || "not available"}**`, s.error ? `Error: \\`${s.error}\\`` : "Errors: **none reported**"].join("\n");
+}
+function formatLogs(s) { const lines = s?.logTail || []; if (!lines.length) return "📜 **No recent Minecraft log lines are available.**"; return "📜 **Recent Minecraft log**\n```\n" + lines.slice(-20).join("\n").slice(-3800) + "\n```"; }
+function formatAddress(s) { return s.publicAddress ? `🌐 **Minecraft address**\n\`${s.publicAddress}\`\n\nPlayit is **${s.playit}**.` : "🌐 **Playit address is not available yet.**\nStart Minecraft and wait for the tunnel to connect."; }
+module.exports = {
+  liveStatus, startServer, stopServer, restartServer, formatOnline, formatWhitelist, formatHealth, formatLogs, formatAddress,
+  operation: () => operation,
+  kick: name => minecraftAction(agent.kick, [name]), ban: name => minecraftAction(agent.ban, [name]), pardon: name => minecraftAction(agent.pardon, [name]),
+  op: name => minecraftAction(agent.op, [name]), deop: name => minecraftAction(agent.deop, [name]),
+  whitelistAdd: name => minecraftAction(agent.whitelistAdd, [name]), whitelistRemove: name => minecraftAction(agent.whitelistRemove, [name]), whitelistClear: () => minecraftAction(agent.whitelistClear),
+  say: message => minecraftAction(agent.say, [message]), save: () => minecraftAction(agent.save), seed: () => minecraftAction(agent.seed), tps: () => minecraftAction(agent.tps), version: () => minecraftAction(agent.version),
+  command: command => minecraftAction(agent.command, [command])
+};
