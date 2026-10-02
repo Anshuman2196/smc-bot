@@ -110,14 +110,14 @@ async function handleAdmin(message, parts) {
 }
 
 const lines = {
-  start: ["🚀 Starting the world.", "⚡ Bringing the server online.", "🎮 Your world is waking up."],
-  stop: ["🌙 Shutting the world down cleanly.", "🛑 Putting the server to sleep.", "🔒 Closing the server safely."],
-  restart: ["🔄 Restarting the world.", "♻️ Giving the server a clean second wind.", "⚡ Fresh start incoming."],
-  online: ["🟢 The world is live.", "👥 Here’s who is in the world right now.", "🎮 Current players:"],
-  stopped: ["🌙 The world is safely offline.", "🔴 Server stopped cleanly.", "🛌 The world is sleeping."],
-  status: ["📡 Here’s the current server pulse.", "🛰️ Live server status:", "👀 Current SMC status:"],
-  error: ["⚠️ SMC hit a snag.", "🧩 Something interrupted that request.", "🚧 That action couldn’t be completed."],
-  help: ["🎮 SMC command deck:", "⚡ Available server commands:", "🛠️ Your SMC controls:"]
+  start: ["Alright, waking the world up.", "Give me a sec, getting the server going.", "Starting it up — one moment."],
+  stop: ["Alright, shutting it down cleanly.", "Okay, putting the server to sleep.", "That’s it for now — shutting the world down."],
+  restart: ["Alright, giving it a fresh start.", "Restarting it — should be back shortly.", "Okay, clean restart coming up."],
+  online: ["Yep, the world is live.", "Here’s who’s in there right now.", "Let’s see who’s online."],
+  stopped: ["All good — the world is offline.", "Server’s down cleanly.", "The world’s taking a nap."],
+  status: ["Here’s what’s happening right now.", "Let me check the server.", "Yep — here’s the current state."],
+  error: ["Hmm, that didn’t quite work.", "Something got in the way there.", "I couldn’t finish that one."],
+  help: ["Here’s what you can do.", "These are the SMC commands.", "Alright, command list coming up."]
 };
 
 const pick = key => lines[key][Math.floor(Math.random() * lines[key].length)];
