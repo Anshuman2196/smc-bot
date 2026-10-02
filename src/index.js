@@ -7,7 +7,7 @@ const client=new Client({intents:[GatewayIntentBits.Guilds,GatewayIntentBits.Gui
 const reply=(m,x)=>m.reply({content:x,allowedMentions:{repliedUser:false}});
 const isControl=m=>m&&(c.adminIds.includes(m.id)||c.controlRoleIds.length&&m.roles?.cache?.some(r=>c.controlRoleIds.includes(r.id))||(!c.adminIds.length&&!c.controlRoleIds.length));
 const allowed=id=>!c.allowedChannelIds.length||c.allowedChannelIds.includes(id);
-async function statusText(){const s=await ctl.snapshot();return ['**SMC Status**','',`Codespace: **${s.codespace}**`,`Minecraft: **${s.mc}**`,`Playit: **${s.playit}**`,`Players: **${s.players??'—'}/${s.max??'—'}**`,`Uptime: **${s.uptimeSec==null?'—':Math.floor(s.uptimeSec/60)+'m'}**`,s.errors?.[0]?`⚠️ ${s.errors[0]}`:'','',`Address: **${c.host}**`].join('\n')}
+async function statusText(){const s=await ctl.snapshot();return ['**SMC Status**','',`Codespace: **${s.codespace}**`,`Minecraft: **${s.mc}**`,`Playit: **${s.playit}**`,`Players: **${s.players??'—'}/${s.max??'—'}` ,`Uptime: **${s.uptimeSec==null?'—':Math.floor(s.uptimeSec/60)+'m'}**`,s.errors?.[0]?`⚠️ ${s.errors[0]}`:'','',`Address: **${c.host}**`].join('\n')}
 function progress(m){let last=0;return async x=>{const now=Date.now();if(now-last<2500)return;last=now;const text=String(x);await m.edit('🟡 **SMC operation in progress**\n`'+text.replace(/`/g,"'")+'`').catch(()=>{})}}
 client.on('messageCreate',async m=>{if(m.author.bot||!m.guild||!allowed(m.channelId))return;const p=m.content.trim().split(/\s+/);if(p[0]?.toLowerCase()!=='smc')return;const cmd=(p[1]||'help').toLowerCase();try{
  if(cmd==='status')return reply(m,await statusText());
@@ -21,7 +21,7 @@ const server=http.createServer(async(req,res)=>{
  if(req.method==='GET'&&(req.url==='/'||req.url==='/health'))return send(200,{ok:true,agent:agent.queueInfo()});
  if(req.method==='POST'&&(req.url==='/agent/poll'||req.url==='/agent/progress'||req.url==='/agent/result')){
   if(!agent.auth(req))return send(401,{error:'unauthorized'});
-  if(req.url==='/agent/poll')return send(200,agent.poll());
+  if(req.url==='/agent/poll'){let raw='';req.on('data',chunk=>raw+=chunk);req.on('end',()=>{let body={};try{body=JSON.parse(raw||'{}')}catch{};return send(200,{...agent.poll(body.status||null),status:agent.queueInfo().status})});return;}
   let raw='';req.on('data',chunk=>raw+=chunk);req.on('end',()=>{try{const body=JSON.parse(raw||'{}');const ok=req.url==='/agent/progress'?agent.progress(body):agent.result(body);send(200,{ok})}catch(e){send(400,{error:e.message})}});return;
  }
  return send(404,{error:'not_found'});
