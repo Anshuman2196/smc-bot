@@ -84,6 +84,7 @@ function status() {
 
 function whitelistAdd(name) {
   if (!connected()) throw new Error("SMC agent is offline");
+  if (snapshot.minecraft !== "running") throw new Error("Minecraft is not running");
   if (!/^[A-Za-z0-9_]{3,16}$/.test(name)) throw new Error("Invalid Minecraft username");
   const id = queueAction("whitelist.add", { name });
   return { id, name };
