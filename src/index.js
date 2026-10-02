@@ -46,20 +46,20 @@ const adminHelp = () => [
   "`smc admin audit` — show recent actions",
   "",
   "Changes apply immediately and last until the bot restarts."
-].join("\\n");
+].join("\n");
 
 async function handleAdmin(message, parts) {
   if (!canAdmin(message.member))
-    return message.reply("🔒 **Admin access required.**\\nUse the configured admin role or admin user ID.");
+    return message.reply("🔒 **Admin access required.**\nUse the configured admin role or admin user ID.");
 
   const target = (parts[2] || "status").toLowerCase();
   const action = (parts[3] || "list").toLowerCase();
   const ref = target === "channel" ? message.mentions.channels.first() : message.mentions.roles.first();
 
   if (target === "help" || target === "status") {
-    return message.reply(adminHelp() + "\\n\\n**Current:**\\n" +
-      "Channels: " + (adminState.allowedChannelIds.length ? adminState.allowedChannelIds.map(id => `<#${id}>`).join(", ") : "All channels") + "\\n" +
-      "Control roles: " + (adminState.controlRoleIds.length ? adminState.controlRoleIds.map(id => `<@&${id}>`).join(", ") : "Anyone, because none are configured") + "\\n" +
+    return message.reply(adminHelp() + "\n\n**Current:**\n" +
+      "Channels: " + (adminState.allowedChannelIds.length ? adminState.allowedChannelIds.map(id => `<#${id}>`).join(", ") : "All channels") + "\n" +
+      "Control roles: " + (adminState.controlRoleIds.length ? adminState.controlRoleIds.map(id => `<@&${id}>`).join(", ") : "Anyone, because none are configured") + "\n" +
       "Admin roles: " + (adminState.adminRoleIds.length ? adminState.adminRoleIds.map(id => `<@&${id}>`).join(", ") : "None configured"));
   }
 
@@ -68,7 +68,7 @@ async function handleAdmin(message, parts) {
   if (target === "audit") { return message.reply("🧾 **Recent SMC audit**\n" + (audit.length ? audit.slice(0, 20).map(x => `• ${x.at} — ${x.user} — ${x.action} — ${x.result}`).join("\n") : "No actions recorded.")); }
 
   if (target === "channel") {
-    if (action === "list") return message.reply("📍 **Allowed channels**\\n" + (adminState.allowedChannelIds.length ? adminState.allowedChannelIds.map(id => `<#${id}>`).join("\\n") : "All channels"));
+    if (action === "list") return message.reply("📍 **Allowed channels**\n" + (adminState.allowedChannelIds.length ? adminState.allowedChannelIds.map(id => `<#${id}>`).join("\n") : "All channels"));
     if (!ref) return message.reply("⚠️ Mention a channel.");
     if (action === "add") {
       if (!adminState.allowedChannelIds.includes(ref.id)) adminState.allowedChannelIds.push(ref.id);
@@ -81,7 +81,7 @@ async function handleAdmin(message, parts) {
   }
 
   if (target === "role") {
-    if (action === "list") return message.reply("🎮 **Control roles**\\n" + (adminState.controlRoleIds.length ? adminState.controlRoleIds.map(id => `<@&${id}>`).join("\\n") : "None — control is open to everyone."));
+    if (action === "list") return message.reply("🎮 **Control roles**\n" + (adminState.controlRoleIds.length ? adminState.controlRoleIds.map(id => `<@&${id}>`).join("\n") : "None — control is open to everyone."));
     if (!ref) return message.reply("⚠️ Mention a role.");
     if (action === "add") {
       if (!adminState.controlRoleIds.includes(ref.id)) adminState.controlRoleIds.push(ref.id);
@@ -94,7 +94,7 @@ async function handleAdmin(message, parts) {
   }
 
   if (target === "adminrole") {
-    if (action === "list") return message.reply("👑 **Admin roles**\\n" + (adminState.adminRoleIds.length ? adminState.adminRoleIds.map(id => `<@&${id}>`).join("\\n") : "None configured — use ADMIN_USER_IDS for initial access."));
+    if (action === "list") return message.reply("👑 **Admin roles**\n" + (adminState.adminRoleIds.length ? adminState.adminRoleIds.map(id => `<@&${id}>`).join("\n") : "None configured — use ADMIN_USER_IDS for initial access."));
     if (action === "clear") {
       adminState.adminRoleIds.length = 0;
       return message.reply("✅ Admin role cleared.");
