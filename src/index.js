@@ -1,8 +1,9 @@
 const http=require('http');
 const {Client,GatewayIntentBits}=require('discord.js');
 const c=require('./config');
-const ctl=require('./direct-controller');
-const client=new Client({intents:[GatewayIntentBits.Guilds,GatewayIntentBits.GuildMessages,GatewayIntentBits.MessageContent]});
+const ctl=require('./controller');
+const agent=require('./agent');
+const client=new Client({intents:[GatewayIntentBits.Guilds,GuildMessages=GatewayIntentBits.GuildMessages,GatewayIntentBits.MessageContent]});
 const reply=(m,x)=>m.reply({content:x,allowedMentions:{repliedUser:false}});
 const isControl=m=>m&&(c.adminIds.includes(m.id)||c.controlRoleIds.length&&m.roles?.cache?.some(r=>c.controlRoleIds.includes(r.id))||(!c.adminIds.length&&!c.controlRoleIds.length));
 const allowed=id=>!c.allowedChannelIds.length||c.allowedChannelIds.includes(id);
@@ -15,6 +16,18 @@ client.on('messageCreate',async m=>{if(m.author.bot||!m.guild||!allowed(m.channe
  if(['start','stop','restart'].includes(cmd)){const r=await reply(m,cmd==='start'?'🟡 Starting SMC…':cmd==='stop'?'🟡 Stopping SMC…':'🟡 Restarting SMC…');const pg=progress(r);if(cmd==='start')await ctl.startServer(pg);else if(cmd==='stop')await ctl.stopServer(pg);else await ctl.restartServer(pg);return r.edit(cmd==='stop'?'🔴 **SMC stopped.**':`🟢 **SMC online!**\n\n${c.host}`).catch(()=>{})}
  return reply(m,['**SMC commands**','`smc start` — start the server','`smc stop` — stop the server and Codespace','`smc restart` — restart Minecraft','`smc status` — show live status','`smc whitelist add <username>` — add a player'].join('\n'));
 }catch(e){return reply(m,`⚠️ ${e.message||'SMC operation failed'}`)}});
-const server=http.createServer((req,res)=>{if(req.method==='GET'&&(req.url==='/'||req.url==='/health')){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({ok:true}))}res.writeHead(404).end()});
+const server=http.createServer(async(req,res)=>{
+ const send=(code,obj)=>{const b=JSON.stringify(obj);res.writeHead(code,{'Content-Type':'application/json','Cache-Control':'no-store','Content-Length':Buffer.byteLength(b)});res.end(b)};
+ if(req.method==='GET'&&(req.url==='/'||req.url==='/health'))return send(200,{ok:true,agent:agent.queueInfo()});
+ if(req.method==='POST'&&(req.url==='/agent/poll'||req.url==='/agent/result')){
+  if(!agent.auth(req))return send(401,{error:'unauthorized'});
+  if(req.url==='/agent/poll'){
+   const job=agent.poll();
+   return send(200,job);
+  }
+  let raw='';req.on('data',chunk=>raw+=chunk);req.on('end',()=>{try{send(200,{ok:agent.result(JSON.parse(raw||'{}'))})}catch(e){send(400,{error:e.message})}});return;
+ }
+ return send(404,{error:'not_found'});
+});
 server.listen(c.httpPort,'0.0.0.0',()=>console.log(`SMC HTTP listening on ${c.httpPort}`));
 client.login(c.discordToken);
