@@ -26,12 +26,12 @@ async function ensureAgent(report) {
   }, 1500);
 }
 async function liveStatus() {
-  const result = { codespace: "offline", agent: "offline", minecraft: "offline", playit: "offline", publicAddress: null, players: null, maxPlayers: null, uptimeSec: null, whitelist: [], error: null };
+  const result = { codespace: "offline", agent: "offline", minecraft: "offline", playit: "offline", publicAddress: null, players: null, maxPlayers: null, uptimeSec: null, crashed: false, lastStopReason: "none", crashStreak: 0, lastCrashAt: null, lastExit: null, whitelist: [], error: null };
   try { const s = await github.state(); result.codespace = s === "Available" ? "online" : s === "ShuttingDown" ? "stopping" : "offline"; } catch (e) { result.error = e.message; return result; }
   if (result.codespace !== "online") return result;
   if (!agent.connected()) return result;
   result.agent = "online";
-  try { const s = agent.status(); Object.assign(result, { minecraft: s.minecraft || "unknown", playit: s.playit || "unknown", publicAddress: s.publicAddress || null, minecraftPort: Boolean(s.minecraftPort), logTail: Array.isArray(s.logTail) ? s.logTail : [], players: s.players || null, maxPlayers: s.players?.max ?? s.maxPlayers ?? null, uptimeSec: s.uptimeSec ?? null, whitelist: Array.isArray(s.whitelist) ? s.whitelist : [], serverProperties: s.serverProperties || {} }); } catch (e) { result.error = e.message; }
+  try { const s = agent.status(); Object.assign(result, { minecraft: s.minecraft || "unknown", playit: s.playit || "unknown", publicAddress: s.publicAddress || null, minecraftPort: Boolean(s.minecraftPort), crashed: Boolean(s.crashed), lastStopReason: s.lastStopReason || "none", crashStreak: s.crashStreak || 0, lastCrashAt: s.lastCrashAt || null, lastExit: s.lastExit ?? null, logTail: Array.isArray(s.logTail) ? s.logTail : [], players: s.players || null, maxPlayers: s.players?.max ?? s.maxPlayers ?? null, uptimeSec: s.uptimeSec ?? null, whitelist: Array.isArray(s.whitelist) ? s.whitelist : [], serverProperties: s.serverProperties || {} }); } catch (e) { result.error = e.message; }
   return result;
 }
 async function startServer(report = async () => {}) {
@@ -69,9 +69,11 @@ async function restartServer(report = async () => {}) {
   try {
     if ((await github.state()) === "Available" && agent.connected()) {
       const current = agent.status();
-      const online = current.players?.online;
-      if (online == null) throw new Error("I can’t verify the player count yet. Try again in a few seconds.");
-      if (online > 0) throw new Error(`The server has ${online} player${online === 1 ? "" : "s"} online. Safe restart waits until everyone leaves.`);
+      if (current.minecraft === "running") {
+        const online = current.players?.online;
+        if (online == null) throw new Error("I can’t verify the player count yet. Try again in a few seconds.");
+        if (online > 0) throw new Error(`The server has ${online} player${online === 1 ? "" : "s"} online. Safe restart waits until everyone leaves.`);
+      }
     }
     agent.setDesired("running");
     await ensureCodespace(report);
@@ -105,7 +107,7 @@ function formatHealth(s) {
   return ["**SMC health**", `Codespace: **${s.codespace}**`, `Agent: **${s.agent}**`, `Minecraft: **${s.minecraft}**`, `Playit: **${s.playit}**`, `Port: **${s.minecraftPort ? "open" : "closed"}**`, `Players: **${p?.online ?? "—"}/${p?.max ?? s.maxPlayers ?? "—"}**`, `Uptime: **${s.uptimeSec == null ? "—" : Math.floor(s.uptimeSec / 60) + "m " + s.uptimeSec % 60 + "s"}**`, `Address: **${s.publicAddress || "not available"}**`, s.error ? "Error: `" + s.error + "`" : "Errors: **none reported**"].join("\n");
 }
 function formatLogs(s) { const lines = s?.logTail || []; if (!lines.length) return "📜 **No recent Minecraft log lines are available.**"; return "📜 **Recent Minecraft log**\n```\n" + lines.slice(-20).join("\n").slice(-3800) + "\n```"; }
-function formatCrash(s) { if (s.minecraft !== "stopped" || s.lastExit == null) return "🟢 **No confirmed crash is recorded.**"; const code = s.lastExit; return "🚨 **Minecraft stopped unexpectedly / may have crashed.**\nExit code: **" + code + "**\n\nRecent log:\n```\n" + (s.logTail || []).slice(-15).join("\n").slice(-3000) + "\n```"; }
+function formatCrash(s) { if (!s.crashed) return "🟢 **Nothing looks crashed right now.**\nThe last Minecraft shutdown was clean."; const code = s.lastExit == null ? "unknown" : s.lastExit; return "🚨 **Minecraft crashed.**\nExit code: **" + code + "**\nCrash streak: **" + (s.crashStreak || 1) + "**\n\nHere’s the tail of the log:\n```\n" + (s.logTail || []).slice(-15).join("\n").slice(-3000) + "\n```"; }
 function formatAddress(s) { return s.publicAddress ? `🌐 **Minecraft address**\n\`${s.publicAddress}\`\n\nPlayit is **${s.playit}**.` : "🌐 **Playit address is not available yet.**\nStart Minecraft and wait for the tunnel to connect."; }
 module.exports = {
   liveStatus, startServer, stopServer, restartServer, formatOnline, formatWhitelist, formatHealth, formatLogs, formatCrash, formatAddress,
