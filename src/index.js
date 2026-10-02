@@ -235,7 +235,8 @@ ${format(result)}`);
         command === "version" ? "Version command completed" :
         "Action completed";
 
-      return working.edit(`🟢 **Done**\\n${label}.`).catch(() => {});
+      return working.edit(`🟢 **Done**
+${label}.`).catch(() => {});
     }
 
     return message.reply(`🟢 **Done** — ${parts.slice(1).join(" ")} completed.`);
