@@ -212,6 +212,11 @@ ${pick("online")}
 ${format(result)}`);
     }
 
+    if (command === "version") {
+      const output = Array.isArray(result?.output) ? result.output.filter(Boolean).slice(-8).join("\n") : "";
+      return message.reply(output ? `🧩 **Minecraft version**\n\`\`\`\n${output}\n\`\`\`` : "⚠️ **Minecraft version**\nMinecraft did not return a version line.");
+    }
+
     return message.reply(`✅ **Done** — ${parts.slice(1).join(" ")} completed.`);
   } catch (error) { record(message, parts.slice(1).join(" "), "error"); return message.reply(`⚠️ **SMC couldn’t complete that.**\n\`${String(error.message || error).replace(/\`/g, "'")}\``); }
 }
