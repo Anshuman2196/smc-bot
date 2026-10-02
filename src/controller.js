@@ -96,7 +96,7 @@ async function requireLive() {
 async function minecraftAction(fn, args) { await requireLive(); return fn(...(args || [])); }
 function formatHealth(s) {
   const p = s.players;
-  return ["**SMC health**", `Codespace: **${s.codespace}**`, `Agent: **${s.agent}**`, `Minecraft: **${s.minecraft}**`, `Playit: **${s.playit}**`, `Port: **${s.minecraftPort ? "open" : "closed"}**`, `Players: **${p?.online ?? "—"}/${p?.max ?? s.maxPlayers ?? "—"}**`, `Uptime: **${s.uptimeSec == null ? "—" : Math.floor(s.uptimeSec / 60) + "m " + s.uptimeSec % 60 + "s"}**`, `Address: **${s.publicAddress || "not available"}**`, s.error ? `Error: \\`${s.error}\\`` : "Errors: **none reported**"].join("\n");
+  return ["**SMC health**", `Codespace: **${s.codespace}**`, `Agent: **${s.agent}**`, `Minecraft: **${s.minecraft}**`, `Playit: **${s.playit}**`, `Port: **${s.minecraftPort ? "open" : "closed"}**`, `Players: **${p?.online ?? "—"}/${p?.max ?? s.maxPlayers ?? "—"}**`, `Uptime: **${s.uptimeSec == null ? "—" : Math.floor(s.uptimeSec / 60) + "m " + s.uptimeSec % 60 + "s"}**`, `Address: **${s.publicAddress || "not available"}**`, s.error ? "Error: `" + s.error + "`" : "Errors: **none reported**"].join("\n");
 }
 function formatLogs(s) { const lines = s?.logTail || []; if (!lines.length) return "📜 **No recent Minecraft log lines are available.**"; return "📜 **Recent Minecraft log**\n```\n" + lines.slice(-20).join("\n").slice(-3800) + "\n```"; }
 function formatAddress(s) { return s.publicAddress ? `🌐 **Minecraft address**\n\`${s.publicAddress}\`\n\nPlayit is **${s.playit}**.` : "🌐 **Playit address is not available yet.**\nStart Minecraft and wait for the tunnel to connect."; }
