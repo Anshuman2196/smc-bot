@@ -17,12 +17,12 @@ const record = (message, action, result = "ok") => { audit.unshift({ at: new Dat
 
 const canAdmin = member =>
   config.adminIds.includes(member.id) ||
-  member.roles.cache.some(role => config.adminRoleIds.includes(role.id));
+  member.roles.cache.some(role => adminState.adminRoleIds.includes(role.id));
 
 const canControl = member =>
   canAdmin(member) ||
-  (!config.adminIds.length && !config.controlRoleIds.length) ||
-  member.roles.cache.some(role => config.controlRoleIds.includes(role.id));
+  (!config.adminIds.length && !adminState.controlRoleIds.length) ||
+  member.roles.cache.some(role => adminState.controlRoleIds.includes(role.id));
 
 const adminState = {
   allowedChannelIds: [...config.allowedChannelIds],
