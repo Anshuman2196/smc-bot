@@ -11,10 +11,93 @@ const client = new Client({
 const allowed = id =>
   !config.allowedChannelIds.length || config.allowedChannelIds.includes(id);
 
-const canControl = member =>
-  !config.adminIds.length && !config.controlRoleIds.length ||
+const canAdmin = member =>
   config.adminIds.includes(member.id) ||
+  member.roles.cache.some(role => config.adminRoleIds.includes(role.id));
+
+const canControl = member =>
+  canAdmin(member) ||
+  (!config.adminIds.length && !config.controlRoleIds.length) ||
   member.roles.cache.some(role => config.controlRoleIds.includes(role.id));
+
+const adminState = {
+  allowedChannelIds: [...config.allowedChannelIds],
+  controlRoleIds: [...config.controlRoleIds],
+  adminRoleIds: [...config.adminRoleIds]
+};
+
+const adminHelp = () => [
+  "**SMC admin controls**",
+  "`smc admin` — show current configuration",
+  "`smc admin channel add #channel` — allow a channel",
+  "`smc admin channel remove #channel` — remove a channel",
+  "`smc admin channel list` — list allowed channels",
+  "`smc admin role add @role` — add a control role",
+  "`smc admin role remove @role` — remove a control role",
+  "`smc admin role list` — list control roles",
+  "`smc admin adminrole set @role` — set the admin role",
+  "`smc admin adminrole clear` — clear the admin role",
+  "`smc admin adminrole list` — show the admin role",
+  "",
+  "Changes apply immediately and last until the bot restarts."
+].join("\\n");
+
+async function handleAdmin(message, parts) {
+  if (!canAdmin(message.member))
+    return message.reply("🔒 **Admin access required.**\\nUse the configured admin role or admin user ID.");
+
+  const target = (parts[2] || "status").toLowerCase();
+  const action = (parts[3] || "list").toLowerCase();
+  const ref = target === "channel" ? message.mentions.channels.first() : message.mentions.roles.first();
+
+  if (target === "help" || target === "status") {
+    return message.reply(adminHelp() + "\\n\\n**Current:**\\n" +
+      "Channels: " + (adminState.allowedChannelIds.length ? adminState.allowedChannelIds.map(id => `<#${id}>`).join(", ") : "All channels") + "\\n" +
+      "Control roles: " + (adminState.controlRoleIds.length ? adminState.controlRoleIds.map(id => `<@&${id}>`).join(", ") : "Anyone, because none are configured") + "\\n" +
+      "Admin roles: " + (adminState.adminRoleIds.length ? adminState.adminRoleIds.map(id => `<@&${id}>`).join(", ") : "None configured"));
+  }
+
+  if (target === "channel") {
+    if (action === "list") return message.reply("📍 **Allowed channels**\\n" + (adminState.allowedChannelIds.length ? adminState.allowedChannelIds.map(id => `<#${id}>`).join("\\n") : "All channels"));
+    if (!ref) return message.reply("⚠️ Mention a channel.");
+    if (action === "add") {
+      if (!adminState.allowedChannelIds.includes(ref.id)) adminState.allowedChannelIds.push(ref.id);
+      return message.reply(`✅ ${ref} is now an allowed SMC channel.`);
+    }
+    if (action === "remove") {
+      adminState.allowedChannelIds.splice(0, adminState.allowedChannelIds.length, ...adminState.allowedChannelIds.filter(id => id !== ref.id));
+      return message.reply(`✅ ${ref} was removed from the allowed SMC channels.`);
+    }
+  }
+
+  if (target === "role") {
+    if (action === "list") return message.reply("🎮 **Control roles**\\n" + (adminState.controlRoleIds.length ? adminState.controlRoleIds.map(id => `<@&${id}>`).join("\\n") : "None — control is open to everyone."));
+    if (!ref) return message.reply("⚠️ Mention a role.");
+    if (action === "add") {
+      if (!adminState.controlRoleIds.includes(ref.id)) adminState.controlRoleIds.push(ref.id);
+      return message.reply(`✅ ${ref} can now control SMC.`);
+    }
+    if (action === "remove") {
+      adminState.controlRoleIds.splice(0, adminState.controlRoleIds.length, ...adminState.controlRoleIds.filter(id => id !== ref.id));
+      return message.reply(`✅ ${ref} can no longer control SMC.`);
+    }
+  }
+
+  if (target === "adminrole") {
+    if (action === "list") return message.reply("👑 **Admin roles**\\n" + (adminState.adminRoleIds.length ? adminState.adminRoleIds.map(id => `<@&${id}>`).join("\\n") : "None configured — use ADMIN_USER_IDS for initial access."));
+    if (action === "clear") {
+      adminState.adminRoleIds.length = 0;
+      return message.reply("✅ Admin role cleared.");
+    }
+    if (action === "set") {
+      if (!ref) return message.reply("⚠️ Mention a role.");
+      adminState.adminRoleIds.splice(0, adminState.adminRoleIds.length, ref.id);
+      return message.reply(`👑 ${ref} is now the SMC admin role.`);
+    }
+  }
+
+  return message.reply(adminHelp());
+}
 
 const lines = {
   start: ["🚀 Starting the world.", "⚡ Bringing the server online.", "🎮 Your world is waking up."],
@@ -53,6 +136,9 @@ async function progress(message, text) {
 async function handle(message, parts) {
   const command = (parts[1] || "help").toLowerCase();
 
+  if (command === "admin")
+    return handleAdmin(message, parts);
+
   if (command === "status")
     return message.reply(format(await controller.liveStatus()));
 
@@ -71,7 +157,8 @@ async function handle(message, parts) {
       "`smc restart` — restart Minecraft",
       "`smc status` — show live server status",
       "`smc online` — show who is online",
-      "`smc whitelist` — show who is whitelisted"
+      "`smc whitelist` — show who is whitelisted",
+      "`smc admin` — manage channels, control roles, and the admin role"
     ].join("\n"));
 
   if (!canControl(message.member))
@@ -103,10 +190,12 @@ async function handle(message, parts) {
 }
 
 client.on("messageCreate", async message => {
-  if (message.author.bot || !message.guild || !allowed(message.channelId)) return;
+  if (message.author.bot || !message.guild) return;
 
   const parts = message.content.trim().split(/\s+/);
   if (parts[0]?.toLowerCase() !== "smc") return;
+  const command = (parts[1] || "help").toLowerCase();
+  if (command !== "admin" && !allowed(message.channelId)) return;
 
   try {
     await handle(message, parts);
