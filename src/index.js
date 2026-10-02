@@ -9,7 +9,11 @@ const client = new Client({
 });
 
 const allowed = id =>
-  !config.allowedChannelIds.length || config.allowedChannelIds.includes(id);
+  !adminState.allowedChannelIds.length || adminState.allowedChannelIds.includes(id);
+
+let locked = false;
+const audit = [];
+const record = (message, action, result = "ok") => { audit.unshift({ at: new Date().toISOString(), user: message.author.tag, action, result }); if (audit.length > 100) audit.pop(); };
 
 const canAdmin = member =>
   config.adminIds.includes(member.id) ||
@@ -135,60 +139,42 @@ async function progress(message, text) {
 
 async function handle(message, parts) {
   const command = (parts[1] || "help").toLowerCase();
-
-  if (command === "admin")
-    return handleAdmin(message, parts);
-
-  if (command === "status")
-    return message.reply(format(await controller.liveStatus()));
-
-  if (command === "online")
-    return message.reply(controller.formatOnline(await controller.liveStatus()));
-
-  if (command === "whitelist")
-    return message.reply(controller.formatWhitelist(await controller.liveStatus()));
-
-  if (command === "help")
-    return message.reply([
-      "**SMC commands**",
-      pick("help"),
-      "`smc start` — start Minecraft",
-      "`smc stop` — stop Minecraft only when the server is empty",
-      "`smc restart` — restart Minecraft",
-      "`smc status` — show live server status",
-      "`smc online` — show who is online",
-      "`smc whitelist` — show who is whitelisted",
-      "`smc admin` — manage channels, control roles, and the admin role"
-    ].join("\n"));
-
-  if (!canControl(message.member))
-    return message.reply(`⚠️ ${pick("error")}\nYou need the configured SMC control role to use this command.`);
-
-  if (!["start", "stop", "restart"].includes(command))
-    return message.reply(`⚠️ ${pick("error")}\nUnknown command. Use \`smc help\`.`);
-
-  const out = await message.reply(`🟡 **SMC**\n${pick(command)}\nWorking on it…`);
-
+  if (command === "admin") return handleAdmin(message, parts);
+  if (!allowed(message.channelId)) return;
+  if (command === "status") return message.reply(format(await controller.liveStatus()));
+  if (command === "health") return message.reply(controller.formatHealth(await controller.liveStatus()));
+  if (command === "logs") return message.reply(controller.formatLogs(await controller.liveStatus()));
+  if (command === "address") return message.reply(controller.formatAddress(await controller.liveStatus()));
+  if (command === "online") return message.reply(controller.formatOnline(await controller.liveStatus()));
+  if (command === "whitelist") return message.reply(controller.formatWhitelist(await controller.liveStatus()));
+  if (command === "help") return message.reply(["**SMC command deck**", pick("help"), "`smc start` — start Minecraft", "`smc stop` — stop only when empty", "`smc restart` — restart Minecraft", "`smc status` — live status", "`smc health` — health snapshot", "`smc online` — players online", "`smc address` — live Playit address", "`smc logs` — recent Minecraft log", "`smc say <message>` — announce in Minecraft", "`smc kick <player>` — kick a player", "`smc ban <player>` / `smc pardon <player>` — ban controls", "`smc op <player>` / `smc deop <player>` — operator controls", "`smc whitelist` / `smc whitelist add/remove/clear` — whitelist file controls (enforcement stays OFF)", "`smc save`, `smc seed`, `smc tps`, `smc version` — server tools", "`smc admin` — permissions, lock, audit and admin controls"].join("\n"));
+  if (!canControl(message.member)) return message.reply("🔒 **Control access required.**\nYou need the configured SMC control role or admin role.");
+  if (locked) return message.reply("🔒 **SMC controls are locked.**\nAn admin must use `smc admin unlock`.");
+  const name = parts[2];
   try {
-    const result =
-      command === "start"
-        ? await controller.startServer(text => progress(out, text))
-        : command === "stop"
-          ? await controller.stopServer(text => progress(out, text))
-          : await controller.restartServer(text => progress(out, text));
-
-    await out.edit(
-      command === "stop"
-        ? `🔴 **SMC stopped.**\n${pick("stopped")}`
-        : `🟢 **SMC online.**\n${pick("online")}\n\n${format(result)}`
-    ).catch(() => {});
-  } catch (error) {
-    await out.edit(
-      `⚠️ **SMC couldn’t complete that.**\n${pick("error")}\n\`${String(error.message || error).replace(/\`/g, "'")}\``
-    ).catch(() => {});
-  }
+    let result;
+    if (command === "start") result = await controller.startServer();
+    else if (command === "stop") result = await controller.stopServer();
+    else if (command === "restart") result = await controller.restartServer();
+    else if (command === "say") { const msg = parts.slice(2).join(" "); if (!msg) throw new Error("Usage: smc say <message>"); result = await controller.say(msg); }
+    else if (command === "kick") result = await controller.kick(name);
+    else if (command === "ban") result = await controller.ban(name);
+    else if (command === "pardon" || command === "unban") result = await controller.pardon(name);
+    else if (command === "op") result = await controller.op(name);
+    else if (command === "deop") result = await controller.deop(name);
+    else if (command === "save") result = await controller.save();
+    else if (command === "seed") result = await controller.seed();
+    else if (command === "tps") result = await controller.tps();
+    else if (command === "version") result = await controller.version();
+    else if (command === "whitelist") { const sub = (parts[2] || "list").toLowerCase(); if (sub === "add") result = await controller.whitelistAdd(parts[3]); else if (sub === "remove" || sub === "rm") result = await controller.whitelistRemove(parts[3]); else if (sub === "clear") result = await controller.whitelistClear(); else return message.reply(controller.formatWhitelist(await controller.liveStatus())); }
+    else if (command === "command") { if (!canAdmin(message.member)) return message.reply("👑 **Admin access required for arbitrary Minecraft commands.**"); const raw = parts.slice(2).join(" "); if (!raw) throw new Error("Usage: smc command <minecraft command>"); result = await controller.command(raw); }
+    else return message.reply("⚠️ Unknown command. Use `smc help`.");
+    record(message, parts.slice(1).join(" "), "queued");
+    if (command === "start" || command === "restart") return message.reply(`🟢 **SMC online.**\n${pick("online")}\n\n${format(result)}`);
+    if (command === "stop") return message.reply("🔴 **SMC stopped.**\n🌙 The world is safely offline.");
+    return message.reply(`✅ **SMC action queued.**\n${parts.slice(1).join(" ")}`);
+  } catch (error) { record(message, parts.slice(1).join(" "), "error"); return message.reply(`⚠️ **SMC couldn’t complete that.**\n\`${String(error.message || error).replace(/\`/g, "'")}\``); }
 }
-
 client.on("messageCreate", async message => {
   if (message.author.bot || !message.guild) return;
 
@@ -204,6 +190,33 @@ client.on("messageCreate", async message => {
   }
 });
 
+async function notify(text) {
+  if (!config.notifyChannelId) return;
+  try { const ch = await client.channels.fetch(config.notifyChannelId); if (ch?.isTextBased()) await ch.send(text); } catch (error) { console.error("Notification failed:", error.message); }
+}
+let monitorSnapshot = null;
+let emptySince = null;
+setInterval(async () => {
+  try {
+    const s = await controller.liveStatus();
+    const compact = [s.codespace, s.minecraft, s.playit, s.publicAddress, s.players?.online ?? null].join("|");
+    if (monitorSnapshot && compact !== monitorSnapshot) {
+      const old = monitorSnapshot.split("|");
+      if (s.minecraft !== old[1]) await notify(s.minecraft === "running" ? "🟢 **Minecraft is online.**" : "🌙 **Minecraft is offline.**");
+      if (s.publicAddress && s.publicAddress !== old[3]) await notify(`🌐 **Playit address:** ${s.publicAddress}`);
+    }
+    monitorSnapshot = compact;
+    if (s.minecraft === "running" && s.players?.online === 0) {
+      if (!emptySince) emptySince = Date.now();
+      const idleMs = config.idleMinutes * 60 * 1000;
+      if (idleMs > 0 && Date.now() - emptySince >= idleMs && !operation) {
+        await notify(`🛌 **SMC idle shutdown:** no players for ${config.idleMinutes} minutes.`);
+        try { await controller.stopServer(); } catch (error) { await notify("⚠️ Idle shutdown was blocked: " + error.message); }
+        emptySince = null;
+      }
+    } else emptySince = null;
+  } catch (error) { console.error("SMC monitor error:", error.message); }
+}, 10000);
 const json = (res, status, data) => {
   res.writeHead(status, {
     "Content-Type": "application/json",
