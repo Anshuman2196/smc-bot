@@ -19,10 +19,23 @@ function enqueue(type, args) { const item = { id: `${Date.now()}-${queue.length 
 function sync(status) { accept(status); return { desiredMinecraft: desired, restartGeneration: generation, action: queue.shift() || null }; }
 function info() { return { connected: connected(), ageMs: seenAt ? Date.now() - seenAt : null, desiredMinecraft: desired, restartGeneration: generation, state }; }
 function status() { if (!connected()) throw new Error("SMC agent is offline"); return state; }
-function whitelistAdd(name) {
+function action(type, args = {}) {
   if (!connected()) throw new Error("SMC agent is offline");
   if (state.minecraft !== "running") throw new Error("Minecraft is not running");
-  if (!/^[A-Za-z0-9_]{3,16}$/.test(name)) throw new Error("Invalid Minecraft username");
-  return enqueue("whitelist.add", { name });
+  return enqueue(type, args);
 }
-module.exports = { authenticated, connected, sync, info, status, setDesired, restart, whitelistAdd };
+function whitelistAdd(name) { return action("whitelist.add", { name }); }
+function whitelistRemove(name) { return action("whitelist.remove", { name }); }
+function whitelistClear() { return action("whitelist.clear"); }
+function kick(name) { return action("kick", { name }); }
+function ban(name) { return action("ban", { name }); }
+function pardon(name) { return action("pardon", { name }); }
+function op(name) { return action("op", { name }); }
+function deop(name) { return action("deop", { name }); }
+function say(message) { return action("say", { message }); }
+function command(command) { return action("command", { command }); }
+function save() { return action("save"); }
+function seed() { return action("seed"); }
+function tps() { return action("tps"); }
+function version() { return action("version"); }
+module.exports = { authenticated, connected, sync, info, status, setDesired, restart, action, whitelistAdd, whitelistRemove, whitelistClear, kick, ban, pardon, op, deop, say, command, save, seed, tps, version };
