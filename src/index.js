@@ -204,7 +204,7 @@ ${pick("restart")}`);
 ${pick("online")}
 
 ${format(result)}`);
-      if (command === "stop") return working.edit(`🔴 **Stopped**\nThe server is safely offline.`);
+      if (command === "stop") return working.edit(`🔴 **Stopped**\\nThe server is safely offline.`);
       if (command === "restart") return working.edit(`🟢 **Restarted**
 ${pick("online")}
 
@@ -213,9 +213,27 @@ ${format(result)}`);
 
     if (command === "version") {
       const output = Array.isArray(result?.output) ? result.output.filter(Boolean).slice(-8).join("\n") : "";
-      return working.edit(output ? `🧩 **Minecraft version**\n\`\`\`\n${output}\n\`\`\`` : "⚠️ **Minecraft version**\nMinecraft did not return a version line.").catch(() => {});
+      return working.edit(output ? `🟢 **Done**\\n🧩 **Minecraft version**\\n\\`\\`\\`\\n${output}\\n\\`\\`\\`` : "⚠️ **Done**\\nMinecraft did not return any output from `/version`.").catch(() => {});
     }
-    return message.reply(`✅ **Done** — ${parts.slice(1).join(" ")} completed.`);
+
+    if (working) {
+      const label = command === "set" ? `Updated \\`${parts[2]}\\`` :
+        command === "kick" ? `Kicked \\`${parts[2]}\\`` :
+        command === "ban" ? `Banned \\`${parts[2]}\\`` :
+        (command === "pardon" || command === "unban") ? `Ban removed for \\`${parts[2]}\\`` :
+        command === "op" ? `Gave \\`${parts[2]}\\` operator access` :
+        command === "deop" ? `Removed operator access from \\`${parts[2]}\\`` :
+        command === "save" ? "World saved" :
+        command === "seed" ? "World seed read" :
+        command === "tps" ? "TPS checked" :
+        command === "say" ? "Message sent" :
+        command === "whitelist" ? "Whitelist updated" :
+        command === "command" ? "Minecraft command completed" :
+        "Action completed";
+      return working.edit(`🟢 **Done**\\n${label}.`).catch(() => {});
+    }
+
+    return message.reply(`🟢 **Done** — ${parts.slice(1).join(" ")} completed.`);
   } catch (error) { record(message, parts.slice(1).join(" "), "error"); return message.reply(`⚠️ **SMC couldn’t complete that.**\n\`${String(error.message || error).replace(/\`/g, "'")}\``); }
 }
 client.on("messageCreate", async message => {
