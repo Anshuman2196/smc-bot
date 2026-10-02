@@ -31,7 +31,7 @@ async function liveStatus() {
   if (result.codespace !== "online") return result;
   if (!agent.connected()) return result;
   result.agent = "online";
-  try { const s = agent.status(); Object.assign(result, { minecraft: s.minecraft || "unknown", playit: s.playit || "unknown", publicAddress: s.publicAddress || null, players: s.players?.online ?? null, maxPlayers: s.players?.max ?? s.maxPlayers ?? null, uptimeSec: s.uptimeSec ?? null, whitelist: Array.isArray(s.whitelist) ? s.whitelist : [] }); } catch (e) { result.error = e.message; }
+  try { const s = agent.status(); Object.assign(result, { minecraft: s.minecraft || "unknown", playit: s.playit || "unknown", publicAddress: s.publicAddress || null, minecraftPort: Boolean(s.minecraftPort), logTail: Array.isArray(s.logTail) ? s.logTail : [], players: s.players || null, maxPlayers: s.players?.max ?? s.maxPlayers ?? null, uptimeSec: s.uptimeSec ?? null, whitelist: Array.isArray(s.whitelist) ? s.whitelist : [] }); } catch (e) { result.error = e.message; }
   return result;
 }
 async function startServer(report = async () => {}) {
