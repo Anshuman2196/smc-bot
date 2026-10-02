@@ -105,7 +105,7 @@ module.exports = {
   operation: () => operation,
   kick: name => minecraftAction(agent.kick, [name]), ban: name => minecraftAction(agent.ban, [name]), pardon: name => minecraftAction(agent.pardon, [name]),
   op: name => minecraftAction(agent.op, [name]), deop: name => minecraftAction(agent.deop, [name]),
-  whitelistAdd: name => minecraftAction(agent.whitelistAdd, [name]), whitelistRemove: name => minecraftAction(agent.whitelistRemove, [name]), whitelistClear: () => minecraftAction(agent.whitelistClear),
+  whitelistAdd: name => minecraftAction(agent.whitelistAdd, [name]), whitelistRemove: name => minecraftAction(agent.whitelistRemove, [name]), whitelistClear: async () => { const s = await requireLive(); for (const name of (s.whitelist || [])) agent.whitelistRemove(name); return { queued: (s.whitelist || []).length }; },
   say: message => minecraftAction(agent.say, [message]), save: () => minecraftAction(agent.save), seed: () => minecraftAction(agent.seed), tps: () => minecraftAction(agent.tps), version: () => minecraftAction(agent.version),
   command: command => minecraftAction(agent.command, [command])
 };
