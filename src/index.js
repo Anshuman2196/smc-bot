@@ -161,9 +161,28 @@ async function handle(message, parts) {
   const name = parts[2];
   try {
     let result;
-    if (command === "start") result = await controller.startServer();
-    else if (command === "stop") result = await controller.stopServer();
-    else if (command === "restart") result = await controller.restartServer();
+    let working = null;
+    const showState = async (title, text) => {
+      const body = `🟡 **${title}**
+${text}`;
+      if (working) await working.edit(body).catch(() => {});
+    };
+
+    if (command === "start") {
+      working = await message.reply(`🟡 **Starting**
+${pick("start")}`);
+      result = await controller.startServer((text) => showState("Starting", text));
+    }
+    else if (command === "stop") {
+      working = await message.reply(`🟡 **Stopping**
+${pick("stop")}`);
+      result = await controller.stopServer((text) => showState("Stopping", text));
+    }
+    else if (command === "restart") {
+      working = await message.reply(`🟡 **Restarting**
+${pick("restart")}`);
+      result = await controller.restartServer((text) => showState("Restarting", text));
+    }
     else if (command === "say") { const msg = parts.slice(2).join(" "); if (!msg) throw new Error("Usage: smc say <message>"); result = await controller.say(msg); }
     else if (command === "set") { if (!canAdmin(message.member)) throw new Error("Admin access required for server.properties."); const key = parts[2]; const value = parts.slice(3).join(" "); if (!key || !value) throw new Error("Usage: smc set <property> <value>"); if (["online-mode","white-list","enforce-whitelist","server-port"].includes(key)) throw new Error("That property is protected by SMC safety rules."); result = await controller.propertySet(key, value); }
     else if (command === "kick") { if (!canAdmin(message.member)) throw new Error("Admin access required for kick."); result = await controller.kick(name); }
@@ -178,10 +197,23 @@ async function handle(message, parts) {
     else if (command === "whitelist") { const sub = (parts[2] || "list").toLowerCase(); if (sub === "add") result = await controller.whitelistAdd(parts[3]); else if (sub === "remove" || sub === "rm") result = await controller.whitelistRemove(parts[3]); else if (sub === "clear") result = await controller.whitelistClear(); else return message.reply(controller.formatWhitelist(await controller.liveStatus())); }
     else if (command === "command") { if (!canAdmin(message.member)) return message.reply("👑 **Admin access required for arbitrary Minecraft commands.**"); const raw = parts.slice(2).join(" "); if (!raw) throw new Error("Usage: smc command <minecraft command>"); result = await controller.command(raw); }
     else return message.reply("⚠️ Unknown command. Use `smc help`.");
-    record(message, parts.slice(1).join(" "), "queued");
-    if (command === "start" || command === "restart") return message.reply(`🟢 **SMC online.**\n${pick("online")}\n\n${format(result)}`);
-    if (command === "stop") return message.reply("🔴 **SMC stopped.**\n🌙 The world is safely offline.");
-    return message.reply(`✅ **SMC action queued.**\n${parts.slice(1).join(" ")}`);
+
+    record(message, parts.slice(1).join(" "), "completed");
+
+    if (working) {
+      if (command === "start") return working.edit(`🟢 **Started**
+${pick("online")}
+
+${format(result)}`);
+      if (command === "stop") return working.edit("🔴 **Stopped**
+The server is safely offline.");
+      if (command === "restart") return working.edit(`🟢 **Restarted**
+${pick("online")}
+
+${format(result)}`);
+    }
+
+    return message.reply(`✅ **Done** — ${parts.slice(1).join(" ")} completed.`);
   } catch (error) { record(message, parts.slice(1).join(" "), "error"); return message.reply(`⚠️ **SMC couldn’t complete that.**\n\`${String(error.message || error).replace(/\`/g, "'")}\``); }
 }
 client.on("messageCreate", async message => {
