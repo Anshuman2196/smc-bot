@@ -14,8 +14,8 @@ let snapshot = {
 };
 let seenAt = 0;
 let desiredMinecraft = "unknown";
-let generation = 0;
-let actionId = 0;
+let restartGeneration = 0;
+let actionSequence = 0;
 const actions = new Map();
 
 function authenticated(request) {
@@ -30,30 +30,26 @@ function update(status) {
   seenAt = Date.now();
   if (status && typeof status === "object") snapshot = { ...snapshot, ...status };
   if (desiredMinecraft === "unknown") {
-    desiredMinecraft = snapshot.minecraft === "running" || snapshot.minecraft === "starting" || snapshot.minecraft === "stopping" ? "running" : "stopped";
+    desiredMinecraft = ["running", "starting", "stopping"].includes(snapshot.minecraft) ? "running" : "stopped";
   }
 }
 
 function requestStart() {
   desiredMinecraft = "running";
-  generation += 1;
-  return generation;
 }
 
 function requestStop() {
   desiredMinecraft = "stopped";
-  generation += 1;
-  return generation;
 }
 
 function requestRestart() {
   desiredMinecraft = "running";
-  generation += 1;
-  return generation;
+  restartGeneration += 1;
+  return restartGeneration;
 }
 
 function queueAction(type, args = {}) {
-  const id = `${Date.now()}-${++actionId}`;
+  const id = `${Date.now()}-${++actionSequence}`;
   actions.set(id, { id, type, args, createdAt: Date.now() });
   return id;
 }
@@ -67,11 +63,7 @@ function takeAction() {
 
 function sync(status) {
   update(status);
-  return {
-    desiredMinecraft,
-    generation,
-    action: takeAction()
-  };
+  return { desiredMinecraft, restartGeneration, action: takeAction() };
 }
 
 function info() {
@@ -80,7 +72,7 @@ function info() {
     seenAt,
     ageMs: seenAt ? Date.now() - seenAt : null,
     desiredMinecraft,
-    generation,
+    restartGeneration,
     snapshot
   };
 }
@@ -97,14 +89,4 @@ function whitelistAdd(name) {
   return { id, name };
 }
 
-module.exports = {
-  authenticated,
-  connected,
-  sync,
-  info,
-  status,
-  requestStart,
-  requestStop,
-  requestRestart,
-  whitelistAdd
-};
+module.exports = { authenticated, connected, sync, info, status, requestStart, requestStop, requestRestart, whitelistAdd };
