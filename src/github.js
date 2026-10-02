@@ -1,1 +1,39 @@
-const c=require("./config");async function gh(m,p){const r=await fetch("https://api.github.com"+p,{method:m,headers:{Authorization:`Bearer ${c.ghToken}`,Accept:"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28","User-Agent":"smc-control-bot"},signal:AbortSignal.timeout(20000)});if(!r.ok)throw new Error(`GitHub ${m} ${p} -> ${r.status}`);return r.status===204?null:r.json()}const b="/user/codespaces/"+encodeURIComponent(c.codespaceName);module.exports={getState:async()=> (await gh("GET",b)).state,start:()=>gh("POST",b+"/start"),stop:()=>gh("POST",b+"/stop")};
+const config = require("./config");
+
+const API = "https://api.github.com";
+
+async function request(method, path) {
+  const response = await fetch(API + path, {
+    method,
+    headers: {
+      Authorization: `Bearer ${config.ghToken}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      "User-Agent": "smc-control-bot-v5"
+    },
+    signal: AbortSignal.timeout(20000)
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(`GitHub ${method} ${path} -> ${response.status}${body ? `: ${body.slice(0, 180)}` : ""}`);
+  }
+  return response.status === 204 ? null : response.json();
+}
+
+const path = () => `/user/codespaces/${encodeURIComponent(config.codespaceName)}`;
+
+async function state() {
+  const data = await request("GET", path());
+  return data.state;
+}
+
+async function start() {
+  return request("POST", `${path()}/start`);
+}
+
+async function stop() {
+  return request("POST", `${path()}/stop`);
+}
+
+module.exports = { state, start, stop };
