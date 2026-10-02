@@ -152,6 +152,8 @@ async function handle(message, parts) {
   if (command === "logs") return message.reply(controller.formatLogs(await controller.liveStatus()));
   if (command === "crash") return message.reply(controller.formatCrash(await controller.liveStatus()));
   if (command === "properties" || command === "props") return message.reply(controller.formatProperties(await controller.liveStatus()));
+  if (command === "crash") return message.reply(controller.formatCrash(await controller.liveStatus()));
+  if (command === "properties" || command === "props") return message.reply(controller.formatProperties(await controller.liveStatus()));
   if (command === "address") return message.reply(controller.formatAddress(await controller.liveStatus()));
   if (command === "online") return message.reply(controller.formatOnline(await controller.liveStatus()));
   if (command === "whitelist" && !["add", "remove", "rm", "clear"].includes((parts[2] || "").toLowerCase())) return message.reply(controller.formatWhitelist(await controller.liveStatus()));
