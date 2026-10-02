@@ -205,15 +205,36 @@ async function notify(text) {
 }
 let monitorSnapshot = null;
 let emptySince = null;
+let crashRecovery = { key: null, attempts: 0, lastAttemptAt: 0 };
 setInterval(async () => {
   try {
     const s = await controller.liveStatus();
     const compact = [s.codespace, s.minecraft, s.playit, s.publicAddress, s.players?.online ?? null].join("|");
     if (monitorSnapshot && compact !== monitorSnapshot) {
       const old = monitorSnapshot.split("|");
-      if (s.minecraft !== old[1]) await notify(s.minecraft === "running" ? "🟢 **Minecraft is online.**" : "🌙 **Minecraft is offline.**");
+      if (s.minecraft !== old[1]) await notify(s.minecraft === "running" ? "🟢 **Minecraft is back online.**" : "🌙 **Minecraft is offline for now.**");
       if (s.publicAddress && s.publicAddress !== old[3]) await notify(`🌐 **Playit address:** ${s.publicAddress}`);
     }
+
+    if (s.crashed) {
+      const key = `${s.lastCrashAt || "unknown"}:${s.lastExit ?? "unknown"}`;
+      if (crashRecovery.key !== key) crashRecovery = { key, attempts: 0, lastAttemptAt: 0 };
+      if (crashRecovery.attempts < config.crashMaxRetries && Date.now() - crashRecovery.lastAttemptAt >= config.crashCooldownMs && !controller.operation()) {
+        crashRecovery.attempts += 1;
+        crashRecovery.lastAttemptAt = Date.now();
+        await notify(`🚨 **Minecraft just crashed.**\nExit code: **${s.lastExit ?? "unknown"}**\nI’m going to try bringing it back up (attempt ${crashRecovery.attempts}/${config.crashMaxRetries}).\n\nLast few log lines:\n\`\`\`\n${(s.logTail || []).slice(-8).join("\n").slice(-1800)}\n\`\`\``);
+        try {
+          await controller.restartServer();
+          await notify("🟢 **It’s back.** Minecraft started again after the crash.");
+        } catch (error) {
+          await notify(`⚠️ **I couldn’t bring Minecraft back automatically.**\n${error.message}\n\nI’ve left it alone so it doesn’t get stuck in a restart loop.`);
+        }
+      } else if (crashRecovery.attempts >= config.crashMaxRetries && Date.now() - crashRecovery.lastAttemptAt >= config.crashCooldownMs) {
+        await notify("🛑 **Minecraft crashed again.** I’m not going to keep restarting it automatically. Check `smc crash` and `smc logs` before starting it again.");
+        crashRecovery.lastAttemptAt = Date.now();
+      }
+    }
+
     monitorSnapshot = compact;
     if (s.minecraft === "running" && s.players?.online === 0) {
       if (!emptySince) emptySince = Date.now();
