@@ -46,15 +46,19 @@ async function startServer(report = async () => {}) {
   } finally { operation = null; }
 }
 async function stopServer(report = async () => {}) {
-  if (operation) throw new Error(`SMC is already ${operation}.`); cooldown(); operation = "stopping";
+  if (operation) throw new Error(`SMC is already ${operation}.`);
+  cooldown(); operation = "stopping";
   try {
-    agent.setDesired("stopped");
-    await report("Minecraft desired state set to STOPPED.");
     if ((await github.state()) !== "Available") return { stopped: true };
-    if (agent.connected()) {
-      try { await waitFor("Minecraft shutdown", async () => !agent.connected() || ["stopped", "offline"].includes(agent.status().minecraft), config.stopTimeoutMs, report, 1000); } catch (e) { await report(`Graceful Minecraft stop window ended: ${e.message}`); }
-    } else await report("Agent is offline; proceeding with Codespace shutdown.");
-    await report("Stopping Codespace…");
+    if (!agent.connected()) throw new Error("SMC agent is offline; I can’t verify whether players are online.");
+    const current = agent.status();
+    const online = current.players?.online;
+    if (online == null) throw new Error("I can’t verify the player count yet. Try again in a few seconds.");
+    if (online > 0) throw new Error(`The server has ${online} player${online === 1 ? "" : "s"} online. SMC will not stop it until everyone leaves.`);
+    agent.setDesired("stopped");
+    await report("No players are online. Shutting Minecraft down cleanly.");
+    await waitFor("Minecraft shutdown", async () => !agent.connected() || ["stopped", "offline"].includes(agent.status().minecraft), config.stopTimeoutMs, report, 1000);
+    await report("Minecraft is empty and stopped. Stopping Codespace…");
     await github.stop();
     await waitFor("Codespace shutdown", async () => ["Shutdown", "Archived"].includes(await github.state()), config.codespaceTimeoutMs, report, 2000);
     return { stopped: true };
@@ -71,5 +75,16 @@ async function restartServer(report = async () => {}) {
     return liveStatus();
   } finally { operation = null; }
 }
-function whitelistAdd(name) { return agent.whitelistAdd(name); }
-module.exports = { liveStatus, startServer, stopServer, restartServer, whitelistAdd, operation: () => operation };
+function formatOnline(s) {
+  if (s.minecraft !== "running") return "🌙 **Minecraft is offline.**\nThere is nobody online because the server is not running.";
+  const p=s.players;
+  if (!p || p.online == null) return "⚠️ **Player list is not available yet.**\nTry again in a few seconds.";
+  if (!p.online) return "🟢 **Nobody is online right now.**\nThe server is empty.";
+  return `🟢 **${p.online} player${p.online===1?"":"s"} online**\n${p.players?.length ? p.players.map(x=>`• ${x}`).join("\n") : "Player names are not available yet."}`;
+}
+function formatWhitelist(s) {
+  const list=s.whitelist||[];
+  if (!list.length) return "📋 **Whitelist is empty.**\nWhitelist enforcement is currently **OFF**.";
+  return `📋 **Whitelisted players (${list.length})**\n${list.map(x=>`• ${x}`).join("\n")}\n\nWhitelist enforcement is currently **OFF**.`;
+}
+module.exports = { liveStatus, startServer, stopServer, restartServer, formatOnline, formatWhitelist, operation: () => operation };
