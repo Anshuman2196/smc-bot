@@ -104,7 +104,6 @@ async function handleAdmin(message, parts) {
 
 const uptime = seconds => seconds == null ? "—" : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 
-const title = text => `**${text}**`;
 const statusIcon = value => ({
   online: "🟢",
   running: "🟢",
@@ -119,7 +118,7 @@ const statusIcon = value => ({
 const format = s => {
   const playerCount = `${s.players?.online ?? "—"}/${s.players?.max ?? s.maxPlayers ?? "—"}`;
   return [
-    `**Smarties • Server Status**`,
+    "**Smarties • Server Status**",
     `${statusIcon(s.minecraft)} Minecraft  •  **${s.minecraft}**`,
     `${statusIcon(s.codespace)} Codespace  •  **${s.codespace}**`,
     `${statusIcon(s.agent)} Agent      •  **${s.agent}**`,
@@ -127,28 +126,9 @@ const format = s => {
     "",
     `Players  **${playerCount}**`,
     `Uptime   **${uptime(s.uptimeSec)}**`,
-    `Address  ${s.publicAddress ? `\`${s.publicAddress}\`` : "**not available**"}`,
-    s.error ? `\\n⚠️ **Error:** ${s.error}` : ""
-  ].filter(Boolean).join("\n");
-};
-
-const format = s => {
-  const address = s.publicAddress || "Not available yet";
-  const playerCount = `${s.players?.online ?? "—"}/${s.players?.max ?? s.maxPlayers ?? "—"}`;
-  return [
-    "╭━━━ **✦ SMC STATUS ✦** ━━━╮",
-    `**${pick("status")}**`,
-    "",
-    `💻 **Codespace**  ${s.codespace}`,
-    `🤖 **Agent**      ${s.agent}`,
-    `⛏️ **Minecraft**  ${s.minecraft}`,
-    `🌐 **Playit**     ${s.playit}`,
-    `👥 **Players**    ${playerCount}`,
-    `⏱️ **Uptime**     ${uptime(s.uptimeSec)}`,
-    `📍 **Address**    ${address}`,
-    s.error ? `⚠️ **Error**      \`${s.error}\`` : null,
-    "╰━━━━━━━━━━━━━━━━━━━━━━╯"
-  ].filter(Boolean).join("\n");
+    `Address  ${s.publicAddress ? \`\\`${s.publicAddress}\\`\` : "**not available**"}`,
+    s.error ? `⚠️ **Error:** ${s.error}` : ""
+  ].filter(Boolean).join("\\n");
 };
 
 async function progress(message, text) {
