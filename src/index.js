@@ -212,7 +212,7 @@ ${text}`;
 
     if (working) {
       if (command === "start") return working.edit(`🟢 **Minecraft is online.**\n${format(result)}`);
-      if (command === "stop") return working.edit("⚫ **Minecraft is offline.**\\nThe server was stopped safely.");
+      if (command === "stop") return working.edit("⚫ **Minecraft is offline.**\nThe server was stopped safely.");
       if (command === "restart") return working.edit(`🟢 **Minecraft restarted.**\n${format(result)}`);
     }
 
