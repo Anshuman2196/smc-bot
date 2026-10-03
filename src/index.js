@@ -132,7 +132,7 @@ const format = s => {
 };
 
 async function progress(message, text) {
-  await message.edit(`🟡 **SMC**\n${text}\n\n${pick("status")}`).catch(() => {});
+  await message.edit(`🟡 **SMC**\n${text}`).catch(() => {});
 }
 
 async function handle(message, parts) {
@@ -259,7 +259,7 @@ client.on("messageCreate", async message => {
   try {
     await handle(message, parts);
   } catch (error) {
-    await message.reply(`⚠️ ${pick("error")}\n${error.message || "SMC request failed."}`).catch(() => {});
+    await message.reply(`⚠️ **SMC error**\n${error.message || "SMC request failed."}`).catch(() => {});
   }
 });
 
