@@ -84,16 +84,26 @@ async function restartServer(report = async () => {}) {
   } finally { operation = null; }
 }
 function formatOnline(s) {
-  if (s.minecraft !== "running") return "🌙 **Minecraft is offline.**\nThere is nobody online because the server is not running.";
-  const p=s.players;
-  if (!p || p.online == null) return "⚠️ **Player list is not available yet.**\nTry again in a few seconds.";
-  if (!p.online) return "🟢 **Nobody is online right now.**\nThe server is empty.";
-  return `🟢 **${p.online} player${p.online===1?"":"s"} online**\n${p.players?.length ? p.players.map(x=>`• ${x}`).join("\n") : "Player names are not available yet."}`;
+  if (s.minecraft !== "running") return "🌙 **MINECRAFT IS OFFLINE**\\nThe world is not running, so nobody is online.";
+  const p = s.players;
+  if (!p || p.online == null) return "⚠️ **PLAYER LIST UNAVAILABLE**\\nTry again in a few seconds.";
+  if (!p.online) return "🟢 **THE WORLD IS EMPTY**\\nNobody is online right now.";
+  return [
+    `🟢 **${p.online} player${p.online === 1 ? "" : "s"} online**`,
+    "",
+    p.players?.length ? p.players.map(x => `• ${x}`).join("\\n") : "Player names are not available yet."
+  ].join("\\n");
 }
 function formatWhitelist(s) {
-  const list=s.whitelist||[];
-  if (!list.length) return "📋 **Whitelist is empty.**\nWhitelist enforcement is currently **OFF**.";
-  return `📋 **Whitelisted players (${list.length})**\n${list.map(x=>`• ${x}`).join("\n")}\n\nWhitelist enforcement is currently **OFF**.`;
+  const list = s.whitelist || [];
+  if (!list.length) return "📋 **WHITELIST**\\nNo players are currently listed.\\n\\n🔓 Enforcement: **OFF**";
+  return [
+    `📋 **WHITELIST — ${list.length} PLAYER${list.length === 1 ? "" : "S"}**`,
+    "",
+    list.map(x => `• ${x}`).join("\\n"),
+    "",
+    "🔓 Enforcement: **OFF**"
+  ].join("\\n");
 }
 async function requireLive() {
   const s = await liveStatus();
@@ -108,7 +118,19 @@ async function minecraftAction(fn, args) {
 }
 function formatHealth(s) {
   const p = s.players;
-  return ["**SMC health**", `Codespace: **${s.codespace}**`, `Agent: **${s.agent}**`, `Minecraft: **${s.minecraft}**`, `Playit: **${s.playit}**`, `Port: **${s.minecraftPort ? "open" : "closed"}**`, `Players: **${p?.online ?? "—"}/${p?.max ?? s.maxPlayers ?? "—"}**`, `Uptime: **${s.uptimeSec == null ? "—" : Math.floor(s.uptimeSec / 60) + "m " + s.uptimeSec % 60 + "s"}**`, `Address: **${s.publicAddress || "not available"}**`, s.error ? "Error: `" + s.error + "`" : "Errors: **none reported**"].join("\n");
+  return [
+    "╭━━━ **✦ SMC HEALTH ✦** ━━━╮",
+    `💻 **Codespace**  ${s.codespace}`,
+    `🤖 **Agent**      ${s.agent}`,
+    `⛏️ **Minecraft**  ${s.minecraft}`,
+    `🌐 **Playit**     ${s.playit}`,
+    `🔌 **Port**       ${s.minecraftPort ? "open" : "closed"}`,
+    `👥 **Players**    ${p?.online ?? "—"}/${p?.max ?? s.maxPlayers ?? "—"}`,
+    `⏱️ **Uptime**     ${s.uptimeSec == null ? "—" : Math.floor(s.uptimeSec / 60) + "m " + s.uptimeSec % 60 + "s"}`,
+    `📍 **Address**    ${s.publicAddress || "not available"}`,
+    s.error ? `⚠️ **Error**      \`${s.error}\`` : "✅ **Errors**     none reported",
+    "╰━━━━━━━━━━━━━━━━━━━━━━╯"
+  ].join("\\n");
 }
 function formatLogs(s) { const lines = s?.logTail || []; if (!lines.length) return "📜 **No recent Minecraft log lines are available.**"; return "📜 **Recent Minecraft log**\n```\n" + lines.slice(-20).join("\n").slice(-3800) + "\n```"; }
 function formatCrash(s) { if (!s.crashed) return "🟢 **Nothing looks crashed right now.**\nThe last Minecraft shutdown was clean."; const code = s.lastExit == null ? "unknown" : s.lastExit; return "🚨 **Minecraft crashed.**\nExit code: **" + code + "**\nCrash streak: **" + (s.crashStreak || 1) + "**\n\nHere’s the tail of the log:\n```\n" + (s.logTail || []).slice(-15).join("\n").slice(-3000) + "\n```"; }
