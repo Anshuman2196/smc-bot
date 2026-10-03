@@ -92,7 +92,7 @@ function formatOnline(s) {
     `🟢 **${p.online} player${p.online === 1 ? "" : "s"} online**`,
     "",
     "👥 **Players**\n\n" + (p.players?.length ? p.players.map(x => `• ${x}`).join("\n") : "Player names are not available yet.")
-  ].join("\n");
+  ].join("\n\n");
 }
 
 function formatWhitelist(s) {
@@ -103,7 +103,7 @@ function formatWhitelist(s) {
     "👥 **Players**\n\n" + (list.length ? list.map(x => `• ${x}`).join("\n") : "No players listed."),
     "",
     "🛡️ **Enforcement** — off"
-  ].join("\n");
+  ].join("\n\n");
 }
 
 async function requireLive() {
