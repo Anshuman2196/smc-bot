@@ -1,6 +1,6 @@
 const config = require("./config");
 
-const WINDOW = Math.max(config.agentStaleMs * 2, 30000);
+const WINDOW = Math.max(config.agentStaleMs * 4, 60000);
 let seenAt = 0;
 let state = { minecraft: "offline", playit: "unknown", minecraftPort: false, players: null, maxPlayers: null, uptimeSec: null, lastExit: null, crashed: false, lastStopReason: "none", crashStreak: 0, lastCrashAt: null, logTail: [] };
 let desired = "stopped";
