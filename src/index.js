@@ -159,9 +159,9 @@ async function handle(message, parts) {
   if (!canControl(message.member)) return message.reply("🔒 **Control access required.**\nYou need the configured SMC control role or admin role.");
   if (locked) return message.reply("🔒 **SMC controls are locked.**\nAn admin must use `smc admin unlock`.");
   const name = parts[2];
+  let working = null;
   try {
     let result;
-    let working = null;
     const showState = async (title, text) => {
       const body = `🟡 **${title}**
 ${text}`;
