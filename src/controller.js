@@ -84,12 +84,17 @@ async function restartServer(report = async () => {}) {
   } finally { operation = null; }
 }
 function formatOnline(s) {
-  if (s.minecraft !== "running") return "⚫ **Minecraft is offline.**\\nThere are no players online.";
+  if (s.minecraft !== "running") return "⚫ **Minecraft is offline.**\nThere are no players online.";
   const p = s.players;
-  if (!p || p.online == null) return "⚪ **Player list unavailable.**\\nTry again in a moment.";
+  if (!p || p.online == null) return "⚪ **Player list unavailable.**\nTry again in a moment.";
   if (!p.online) return "🟢 **No players online.**";
-  return [`🟢 **${p.online} player${p.online === 1 ? "" : "s"} online**`, "", p.players?.length ? p.players.map(x => `• ${x}`).join("\n") : "Player names are not available yet."].join("\n");
+  return [
+    `🟢 **${p.online} player${p.online === 1 ? "" : "s"} online**`,
+    "",
+    p.players?.length ? p.players.map(x => `• ${x}`).join("\n") : "Player names are not available yet."
+  ].join("\n");
 }
+
 function formatWhitelist(s) {
   const list = s.whitelist || [];
   return [
@@ -97,39 +102,61 @@ function formatWhitelist(s) {
     "",
     list.length ? list.map(x => `• ${x}`).join("\n") : "No players listed.",
     "",
-    "Enforcement: **off**"
+    "Enforcement — **off**"
   ].join("\n");
 }
+
 async function requireLive() {
   const s = await liveStatus();
   if (s.agent !== "online") throw new Error("SMC agent is offline.");
   if (s.minecraft !== "running") throw new Error("Minecraft is not running.");
   return s;
 }
+
 async function minecraftAction(fn, args) {
   await requireLive();
   const item = fn(...(args || []));
   return agent.waitForAction(item.id);
 }
+
 function formatHealth(s) {
   const p = s.players;
   return [
     "**Smarties • Health**",
     "",
-    `Minecraft  **${s.minecraft}**`,
-    `Codespace  **${s.codespace}**`,
-    `Agent      **${s.agent}**`,
-    `Playit     **${s.playit}**`,
-    `Port       **${s.minecraftPort ? "open" : "closed"}**`,
-    `Players    **${p?.online ?? "—"}/${p?.max ?? s.maxPlayers ?? "—"}**`,
-    `Uptime     **${s.uptimeSec == null ? "—" : Math.floor(s.uptimeSec / 60) + "m " + s.uptimeSec % 60 + "s"}**`,
-    `Address    ${s.publicAddress ? `\`${s.publicAddress}\`` : "**not available**"}`,
-    s.error ? `\\n⚠️ **Error:** ${s.error}` : "✓ No errors reported"
+    `Minecraft — **${s.minecraft}**`,
+    `Codespace — **${s.codespace}**`,
+    `Agent — **${s.agent}**`,
+    `Playit — **${s.playit}**`,
+    `Port — **${s.minecraftPort ? "open" : "closed"}**`,
+    `Players — **${p?.online ?? "—"}/${p?.max ?? s.maxPlayers ?? "—"}**`,
+    `Uptime — **${s.uptimeSec == null ? "—" : Math.floor(s.uptimeSec / 60) + "m " + s.uptimeSec % 60 + "s"}**`,
+    `Address — ${s.publicAddress ? "\`" + s.publicAddress + "\`" : "not available"}`,
+    s.error ? `⚠️ **Error** — ${s.error}` : "✓ No errors reported"
   ].join("\n");
 }
-function formatLogs(s) { const lines = s?.logTail || []; if (!lines.length) return "📜 **No recent Minecraft log lines are available.**"; return "📜 **Recent Minecraft log**\n```\n" + lines.slice(-20).join("\n").slice(-3800) + "\n```"; }
-function formatCrash(s) { if (!s.crashed) return "🟢 **Nothing looks crashed right now.**\nThe last Minecraft shutdown was clean."; const code = s.lastExit == null ? "unknown" : s.lastExit; return "🚨 **Minecraft crashed.**\nExit code: **" + code + "**\nCrash streak: **" + (s.crashStreak || 1) + "**\n\nHere’s the tail of the log:\n```\n" + (s.logTail || []).slice(-15).join("\n").slice(-3000) + "\n```"; }
-function formatAddress(s) { return s.publicAddress ? `🌐 **Minecraft address**\n\`${s.publicAddress}\`\n\nPlayit is **${s.playit}**.` : "🌐 **Playit address is not available yet.**\nStart Minecraft and wait for the tunnel to connect."; }
+
+function formatLogs(s) {
+  const lines = s?.logTail || [];
+  if (!lines.length) return "📜 **No recent Minecraft log lines are available.**";
+  return "📜 **Recent Minecraft log**\n```\n" + lines.slice(-20).join("\n").slice(-3800) + "\n```";
+}
+
+function formatCrash(s) {
+  if (!s.crashed) return "🟢 **Nothing looks crashed right now.**\nThe last Minecraft shutdown was clean.";
+  const code = s.lastExit == null ? "unknown" : s.lastExit;
+  return "🚨 **Minecraft crashed.**\n" +
+    "Exit code — **" + code + "**\n" +
+    "Crash streak — **" + (s.crashStreak || 1) + "**\n\n" +
+    "Here’s the tail of the log:\n```\n" +
+    (s.logTail || []).slice(-15).join("\n").slice(-3000) + "\n```";
+}
+
+function formatAddress(s) {
+  return s.publicAddress
+    ? `🌐 **Smarties • Minecraft Address**\n\`${s.publicAddress}\`\n\nPlayit — **${s.playit}**`
+    : "🌐 **Playit address is not available yet.**\nStart Minecraft and wait for the tunnel to connect.";
+}
 module.exports = {
   liveStatus, startServer, stopServer, restartServer, formatOnline, formatWhitelist, formatHealth, formatLogs, formatCrash, formatAddress,
   operation: () => operation,
