@@ -84,10 +84,10 @@ async function restartServer(report = async () => {}) {
   } finally { operation = null; }
 }
 function formatOnline(s) {
-  if (s.minecraft !== "running") return "⚫ **Minecraft is offline.**\nThere are no players online.";
+  if (s.minecraft !== "running") return "⚫ **Minecraft is offline**\n\nThere are no players online.";
   const p = s.players;
-  if (!p || p.online == null) return "⚪ **Player list unavailable.**\nTry again in a moment.";
-  if (!p.online) return "🟢 **No players online.**";
+  if (!p || p.online == null) return "⚪ **Player list unavailable**\n\nTry again in a moment.";
+  if (!p.online) return "🟢 **No players online**\n\nThe server is ready for someone to join.";
   return [
     `🟢 **${p.online} player${p.online === 1 ? "" : "s"} online**`,
     "",
@@ -122,30 +122,30 @@ async function minecraftAction(fn, args) {
 function formatHealth(s) {
   const p = s.players;
   return [
-    "**Smarties • Health**",
+    "**Smarties • System Health**",
     "",
-    `Minecraft — **${s.minecraft}**`,
-    `Codespace — **${s.codespace}**`,
-    `Agent — **${s.agent}**`,
-    `Playit — **${s.playit}**`,
-    `Port — **${s.minecraftPort ? "open" : "closed"}**`,
-    `Players — **${p?.online ?? "—"}/${p?.max ?? s.maxPlayers ?? "—"}**`,
-    `Uptime — **${s.uptimeSec == null ? "—" : Math.floor(s.uptimeSec / 60) + "m " + s.uptimeSec % 60 + "s"}**`,
+    `${s.minecraft === "running" ? "🟢" : "⚫"} **Minecraft** — ${s.minecraft}`,
+    `${s.codespace === "online" ? "🟢" : "⚫"} **Codespace** — ${s.codespace}`,
+    `${s.agent === "online" ? "🟢" : "⚫"} **Agent** — ${s.agent}`,
+    `${s.playit === "online" ? "🟢" : "⚫"} **Playit** — ${s.playit}`,
+    `🔌 **Port** — ${s.minecraftPort ? "open" : "closed"}`,
+    `👥 **Players** — ${p?.online ?? "—"} / ${p?.max ?? s.maxPlayers ?? "—"}`,
+    `⏱️ **Uptime** — ${s.uptimeSec == null ? "—" : Math.floor(s.uptimeSec / 60) + "m " + s.uptimeSec % 60 + "s"}`,
     `Address — ${s.publicAddress ? "\`" + s.publicAddress + "\`" : "not available"}`,
-    s.error ? `⚠️ **Error** — ${s.error}` : "✓ No errors reported"
+    s.error ? `⚠️ **Error** — ${s.error}` : "✅ **No errors reported**"
   ].join("\n");
 }
 
 function formatLogs(s) {
   const lines = s?.logTail || [];
-  if (!lines.length) return "📜 **No recent Minecraft log lines are available.**";
-  return "📜 **Recent Minecraft log**\n```\n" + lines.slice(-20).join("\n").slice(-3800) + "\n```";
+  if (!lines.length) return "📜 **No recent Minecraft logs**\n\nThere are no log lines available right now.";
+  return "📜 **Recent Minecraft Logs**\n\n```\n" + lines.slice(-20).join("\n").slice(-3800) + "\n```";
 }
 
 function formatCrash(s) {
-  if (!s.crashed) return "🟢 **Nothing looks crashed right now.**\nThe last Minecraft shutdown was clean.";
+  if (!s.crashed) return "🟢 **Minecraft looks healthy**\n\nThere is no active crash to report.";
   const code = s.lastExit == null ? "unknown" : s.lastExit;
-  return "🚨 **Minecraft crashed.**\n" +
+  return "🚨 **Minecraft crashed**\n\n" +
     "Exit code — **" + code + "**\n" +
     "Crash streak — **" + (s.crashStreak || 1) + "**\n\n" +
     "Here’s the tail of the log:\n```\n" +
@@ -154,7 +154,7 @@ function formatCrash(s) {
 
 function formatAddress(s) {
   return s.publicAddress
-    ? `🌐 **Smarties • Minecraft Address**\n\`${s.publicAddress}\`\n\nPlayit — **${s.playit}**`
+    ? "🌐 **Smarties • Minecraft Address**\n\n`" + s.publicAddress + "`\n\n🔗 Playit — **" + s.playit + "**"
     : "🌐 **Playit address is not available yet.**\nStart Minecraft and wait for the tunnel to connect.";
 }
 module.exports = {
@@ -166,5 +166,5 @@ module.exports = {
   say: message => minecraftAction(agent.say, [message]), save: () => minecraftAction(agent.save),
   command: command => minecraftAction(agent.command, [command]),
   propertySet: (key, value) => minecraftAction(agent.propertySet, [key, value]),
-  formatProperties: s => { const p=s.serverProperties||{}; const keys=["motd","difficulty","gamemode","max-players","view-distance","simulation-distance","pvp","allow-flight","spawn-protection","online-mode","white-list","enforce-whitelist","server-port"]; return "⚙️ **server.properties**\n```\n"+keys.map(k=>k+"="+(p[k] ?? "(unset)")).join("\n")+"\n```"; }
+  formatProperties: s => { const p=s.serverProperties||{}; const keys=["motd","difficulty","gamemode","max-players","view-distance","simulation-distance","pvp","allow-flight","spawn-protection","online-mode","white-list","enforce-whitelist","server-port"]; return "⚙️ **Server Properties**\n\n```\n"+keys.map(k=>k+"="+(p[k] ?? "(unset)")).join("\n")+"\n```"; }
 };
