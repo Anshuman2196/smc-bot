@@ -126,7 +126,7 @@ const format = s => {
     "",
     `Players  **${playerCount}**`,
     `Uptime   **${uptime(s.uptimeSec)}**`,
-    `Address  ${s.publicAddress ? \`\\`${s.publicAddress}\\`\` : "**not available**"}`,
+    `Address  ${s.publicAddress ? "[" + s.publicAddress + "]" : "**not available**"}`,
     s.error ? `⚠️ **Error:** ${s.error}` : ""
   ].filter(Boolean).join("\n");
 };
