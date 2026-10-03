@@ -84,26 +84,21 @@ async function restartServer(report = async () => {}) {
   } finally { operation = null; }
 }
 function formatOnline(s) {
-  if (s.minecraft !== "running") return "🌙 **MINECRAFT IS OFFLINE**\\nThe world is not running, so nobody is online.";
+  if (s.minecraft !== "running") return "⚫ **Minecraft is offline.**\\nThere are no players online.";
   const p = s.players;
-  if (!p || p.online == null) return "⚠️ **PLAYER LIST UNAVAILABLE**\\nTry again in a few seconds.";
-  if (!p.online) return "🟢 **THE WORLD IS EMPTY**\\nNobody is online right now.";
-  return [
-    `🟢 **${p.online} player${p.online === 1 ? "" : "s"} online**`,
-    "",
-    p.players?.length ? p.players.map(x => `• ${x}`).join("\\n") : "Player names are not available yet."
-  ].join("\\n");
+  if (!p || p.online == null) return "⚪ **Player list unavailable.**\\nTry again in a moment.";
+  if (!p.online) return "🟢 **No players online.**";
+  return [`🟢 **${p.online} player${p.online === 1 ? "" : "s"} online**`, "", p.players?.length ? p.players.map(x => `• ${x}`).join("\n") : "Player names are not available yet."].join("\n");
 }
 function formatWhitelist(s) {
   const list = s.whitelist || [];
-  if (!list.length) return "📋 **WHITELIST**\\nNo players are currently listed.\\n\\n🔓 Enforcement: **OFF**";
   return [
-    `📋 **WHITELIST — ${list.length} PLAYER${list.length === 1 ? "" : "S"}**`,
+    "**Smarties • Whitelist**",
     "",
-    list.map(x => `• ${x}`).join("\\n"),
+    list.length ? list.map(x => `• ${x}`).join("\n") : "No players listed.",
     "",
-    "🔓 Enforcement: **OFF**"
-  ].join("\\n");
+    "Enforcement: **off**"
+  ].join("\n");
 }
 async function requireLive() {
   const s = await liveStatus();
@@ -119,18 +114,18 @@ async function minecraftAction(fn, args) {
 function formatHealth(s) {
   const p = s.players;
   return [
-    "╭━━━ **✦ SMC HEALTH ✦** ━━━╮",
-    `💻 **Codespace**  ${s.codespace}`,
-    `🤖 **Agent**      ${s.agent}`,
-    `⛏️ **Minecraft**  ${s.minecraft}`,
-    `🌐 **Playit**     ${s.playit}`,
-    `🔌 **Port**       ${s.minecraftPort ? "open" : "closed"}`,
-    `👥 **Players**    ${p?.online ?? "—"}/${p?.max ?? s.maxPlayers ?? "—"}`,
-    `⏱️ **Uptime**     ${s.uptimeSec == null ? "—" : Math.floor(s.uptimeSec / 60) + "m " + s.uptimeSec % 60 + "s"}`,
-    `📍 **Address**    ${s.publicAddress || "not available"}`,
-    s.error ? `⚠️ **Error**      \`${s.error}\`` : "✅ **Errors**     none reported",
-    "╰━━━━━━━━━━━━━━━━━━━━━━╯"
-  ].join("\\n");
+    "**Smarties • Health**",
+    "",
+    `Minecraft  **${s.minecraft}**`,
+    `Codespace  **${s.codespace}**`,
+    `Agent      **${s.agent}**`,
+    `Playit     **${s.playit}**`,
+    `Port       **${s.minecraftPort ? "open" : "closed"}**`,
+    `Players    **${p?.online ?? "—"}/${p?.max ?? s.maxPlayers ?? "—"}**`,
+    `Uptime     **${s.uptimeSec == null ? "—" : Math.floor(s.uptimeSec / 60) + "m " + s.uptimeSec % 60 + "s"}**`,
+    `Address    ${s.publicAddress ? `\`${s.publicAddress}\`` : "**not available**"}`,
+    s.error ? `\\n⚠️ **Error:** ${s.error}` : "✓ No errors reported"
+  ].join("\n");
 }
 function formatLogs(s) { const lines = s?.logTail || []; if (!lines.length) return "📜 **No recent Minecraft log lines are available.**"; return "📜 **Recent Minecraft log**\n```\n" + lines.slice(-20).join("\n").slice(-3800) + "\n```"; }
 function formatCrash(s) { if (!s.crashed) return "🟢 **Nothing looks crashed right now.**\nThe last Minecraft shutdown was clean."; const code = s.lastExit == null ? "unknown" : s.lastExit; return "🚨 **Minecraft crashed.**\nExit code: **" + code + "**\nCrash streak: **" + (s.crashStreak || 1) + "**\n\nHere’s the tail of the log:\n```\n" + (s.logTail || []).slice(-15).join("\n").slice(-3000) + "\n```"; }
@@ -144,5 +139,5 @@ module.exports = {
   say: message => minecraftAction(agent.say, [message]), save: () => minecraftAction(agent.save),
   command: command => minecraftAction(agent.command, [command]),
   propertySet: (key, value) => minecraftAction(agent.propertySet, [key, value]),
-  formatProperties: s => { const p=s.serverProperties||{}; const keys=["motd","difficulty","gamemode","max-players","view-distance","simulation-distance","pvp","allow-flight","spawn-protection","online-mode","white-list","enforce-whitelist","server-port"]; return "⚙️ **server.properties**\\n```\\n"+keys.map(k=>k+"="+(p[k] ?? "(unset)")).join("\\n")+"\\n```"; }
+  formatProperties: s => { const p=s.serverProperties||{}; const keys=["motd","difficulty","gamemode","max-players","view-distance","simulation-distance","pvp","allow-flight","spawn-protection","online-mode","white-list","enforce-whitelist","server-port"]; return "⚙️ **server.properties**\n```\n"+keys.map(k=>k+"="+(p[k] ?? "(unset)")).join("\n")+"\n```"; }
 };
