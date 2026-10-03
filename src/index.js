@@ -271,8 +271,8 @@ setInterval(async () => {
     const compact = [s.codespace, s.minecraft, s.playit, s.publicAddress, s.players?.online ?? null].join("|");
     if (monitorSnapshot && compact !== monitorSnapshot) {
       const old = monitorSnapshot.split("|");
-      if (s.minecraft !== old[1] && s.minecraft === "running") await notify("🟢 **Minecraft is back online.**");
-      if (s.publicAddress && s.publicAddress !== old[3]) await notify(`🌐 **Playit address:** ${s.publicAddress}`);
+      if (s.minecraft !== old[1] && s.minecraft === "running") await notify("╭━━━ 🟢 **SMARTIES IS ONLINE** ━━━╮\\nThe Minecraft world is back up and ready.\\n╰━━━━━━━━━━━━━━━━━━━━━━╯");
+      if (s.publicAddress && s.publicAddress !== old[3]) await notify(`╭━━━ 🌐 **SERVER ADDRESS** ━━━╮\\n\\${s.publicAddress}\\n╰━━━━━━━━━━━━━━━━━━━━━━╯`);
     }
 
     if (s.crashed) {
@@ -284,12 +284,12 @@ setInterval(async () => {
         await notify(`🚨 **Minecraft just crashed.**\nExit code: **${s.lastExit ?? "unknown"}**\nI’m going to try bringing it back up (attempt ${crashRecovery.attempts}/${config.crashMaxRetries}).\n\nLast few log lines:\n\`\`\`\n${(s.logTail || []).slice(-8).join("\n").slice(-1800)}\n\`\`\``);
         try {
           await controller.restartServer();
-          await notify("🟢 **It’s back.** Minecraft started again after the crash.");
+          await notify("🟢 **RECOVERY COMPLETE**\\nMinecraft started successfully after the crash.");
         } catch (error) {
-          await notify(`⚠️ **I couldn’t bring Minecraft back automatically.**\n${error.message}\n\nI’ve left it alone so it doesn’t get stuck in a restart loop.`);
+          await notify(`⚠️ **AUTOMATIC RECOVERY FAILED**\\n\\${error.message}\\n\\nAutomatic retries have been stopped to prevent a restart loop.`);
         }
       } else if (crashRecovery.attempts >= config.crashMaxRetries && Date.now() - crashRecovery.lastAttemptAt >= config.crashCooldownMs) {
-        await notify("🛑 **Minecraft crashed again.** I’m not going to keep restarting it automatically. Check `smc crash` and `smc logs` before starting it again.");
+        await notify("🛑 **RECOVERY STOPPED**\\nMinecraft crashed again, so automatic restarts have been paused.\\n\\nUse `smc crash` and `smc logs` to investigate.");
         crashRecovery.lastAttemptAt = Date.now();
       }
     }
@@ -299,8 +299,8 @@ setInterval(async () => {
       if (!emptySince) emptySince = Date.now();
       const idleMs = config.idleMinutes * 60 * 1000;
       if (idleMs > 0 && Date.now() - emptySince >= idleMs && !controller.operation()) {
-        await notify(`🛌 **SMC idle shutdown:** no players for ${config.idleMinutes} minutes.`);
-        try { await controller.stopServer(); } catch (error) { await notify("⚠️ Idle shutdown was blocked: " + error.message); }
+        await notify(`🛌 **IDLE SHUTDOWN**\\nNo players have been online for **${config.idleMinutes} minutes**.\\nSMC is shutting the world down safely.`);
+        try { await controller.stopServer(); } catch (error) { await notify("⚠️ **IDLE SHUTDOWN BLOCKED**\\n" + error.message); }
         emptySince = null;
       }
     } else emptySince = null;
