@@ -32,7 +32,7 @@ const adminState = {
 
 const adminHelp = () => [
   "**SMC • Admin**",
-  "",
+    "",
   "`smc admin` — current configuration",
   "`smc admin channel add/remove/list` — channel access",
   "`smc admin role add/remove/list` — control roles",
@@ -162,7 +162,7 @@ async function handle(message, parts) {
     "`smc address` — Playit address",
     "`smc logs` — recent log",
     "`smc crash` — crash details",
-  "",
+    "",
   "**Players**",
   "`smc say <message>`",
   "`smc kick <player>`",
@@ -286,7 +286,7 @@ setInterval(async () => {
       if (crashRecovery.attempts < config.crashMaxRetries && Date.now() - crashRecovery.lastAttemptAt >= config.crashCooldownMs && !controller.operation()) {
         crashRecovery.attempts += 1;
         crashRecovery.lastAttemptAt = Date.now();
-        await notify(`🚨 **Minecraft just crashed.**\nExit code: **${s.lastExit ?? "unknown"}**\nI’m going to try bringing it back up (attempt ${crashRecovery.attempts}/${config.crashMaxRetries}).\n\nLast few log lines:\n\`\`\`\n${(s.logTail || []).slice(-8).join("\n").slice(-1800)}\n\`\`\``);
+        await notify("🚨 **Minecraft just crashed.\nExit code: **" + (s.lastExit ?? "unknown") + "**\nI’m going to try bringing it back up (attempt " + crashRecovery.attempts + "/" + config.crashMaxRetries + ").\n\nLast few log lines:\n```\n" + (s.logTail || []).slice(-8).join("\n").slice(-1800) + "\n```");
         try {
           await controller.restartServer();
           await notify("🟢 **RECOVERY COMPLETE**\nMinecraft started successfully after the crash.");
