@@ -50,7 +50,7 @@ const adminHelp = () => [
 
 async function handleAdmin(message, parts) {
   if (!canAdmin(message.member))
-    return message.reply("╭━━━ 🔒 **ACCESS DENIED** ━━━╮\\nYou need the configured SMC admin role or admin user ID.\\n╰━━━━━━━━━━━━━━━━━━━━━━╯");
+    return message.reply("╭━━━ 🔒 **ACCESS DENIED** ━━━╮\nYou need the configured SMC admin role or admin user ID.\n╰━━━━━━━━━━━━━━━━━━━━━━╯");
 
   const target = (parts[2] || "status").toLowerCase();
   const action = (parts[3] || "list").toLowerCase();
@@ -63,20 +63,20 @@ async function handleAdmin(message, parts) {
       "Admin roles: " + (adminState.adminRoleIds.length ? adminState.adminRoleIds.map(id => `<@&${id}>`).join(", ") : "None configured"));
   }
 
-  if (target === "lock") { locked = true; return message.reply("🔒 **SMC controls locked.**\\nAll control commands are temporarily disabled."); }
-  if (target === "unlock") { locked = false; return message.reply("🔓 **SMC controls unlocked.**\\nControl commands are available again."); }
+  if (target === "lock") { locked = true; return message.reply("🔒 **SMC controls locked.**\nAll control commands are temporarily disabled."); }
+  if (target === "unlock") { locked = false; return message.reply("🔓 **SMC controls unlocked.**\nControl commands are available again."); }
   if (target === "audit") { return message.reply("🧾 **Recent SMC audit**\n" + (audit.length ? audit.slice(0, 20).map(x => `• ${x.at} — ${x.user} — ${x.action} — ${x.result}`).join("\n") : "No actions recorded.")); }
 
   if (target === "channel") {
     if (action === "list") return message.reply("📍 **Allowed channels**\n" + (adminState.allowedChannelIds.length ? adminState.allowedChannelIds.map(id => `<#${id}>`).join("\n") : "All channels"));
-    if (!ref) return message.reply("⚠️ **Channel required.**\\nMention the Discord channel you want to use.");
+    if (!ref) return message.reply("⚠️ **Channel required.**\nMention the Discord channel you want to use.");
     if (action === "add") {
       if (!adminState.allowedChannelIds.includes(ref.id)) adminState.allowedChannelIds.push(ref.id);
-      return message.reply(`✅ **Channel added**\\n${ref} can now receive SMC commands.`);
+      return message.reply(`✅ **Channel added**\n${ref} can now receive SMC commands.`);
     }
     if (action === "remove") {
       adminState.allowedChannelIds.splice(0, adminState.allowedChannelIds.length, ...adminState.allowedChannelIds.filter(id => id !== ref.id));
-      return message.reply(`✅ **Channel removed**\\n${ref} can no longer receive SMC commands.`);
+      return message.reply(`✅ **Channel removed**\n${ref} can no longer receive SMC commands.`);
     }
   }
 
@@ -85,11 +85,11 @@ async function handleAdmin(message, parts) {
     if (!ref) return message.reply("⚠️ Mention a role.");
     if (action === "add") {
       if (!adminState.controlRoleIds.includes(ref.id)) adminState.controlRoleIds.push(ref.id);
-      return message.reply(`✅ **Control role added**\\n${ref} can now control SMC.`);
+      return message.reply(`✅ **Control role added**\n${ref} can now control SMC.`);
     }
     if (action === "remove") {
       adminState.controlRoleIds.splice(0, adminState.controlRoleIds.length, ...adminState.controlRoleIds.filter(id => id !== ref.id));
-      return message.reply(`✅ **Control role removed**\\n${ref} can no longer control SMC.`);
+      return message.reply(`✅ **Control role removed**\n${ref} can no longer control SMC.`);
     }
   }
 
@@ -97,12 +97,12 @@ async function handleAdmin(message, parts) {
     if (action === "list") return message.reply("👑 **Admin roles**\n" + (adminState.adminRoleIds.length ? adminState.adminRoleIds.map(id => `<@&${id}>`).join("\n") : "None configured — use ADMIN_USER_IDS for initial access."));
     if (action === "clear") {
       adminState.adminRoleIds.length = 0;
-      return message.reply("✅ **Admin role cleared.**\\nInitial access remains available through `ADMIN_USER_IDS`.");
+      return message.reply("✅ **Admin role cleared.**\nInitial access remains available through `ADMIN_USER_IDS`.");
     }
     if (action === "set") {
       if (!ref) return message.reply("⚠️ Mention a role.");
       adminState.adminRoleIds.splice(0, adminState.adminRoleIds.length, ref.id);
-      return message.reply(`👑 **Admin role updated**\\n${ref} is now the SMC admin role.`);
+      return message.reply(`👑 **Admin role updated**\n${ref} is now the SMC admin role.`);
     }
   }
 
@@ -139,7 +139,7 @@ const format = s => {
     `📍 **Address**    ${address}`,
     s.error ? `⚠️ **Error**      \`${s.error}\`` : null,
     "╰━━━━━━━━━━━━━━━━━━━━━━╯"
-  ].filter(Boolean).join("\\n");
+  ].filter(Boolean).join("\n");
 };
 
 async function progress(message, text) {
@@ -158,9 +158,37 @@ async function handle(message, parts) {
   if (command === "address") return message.reply(controller.formatAddress(await controller.liveStatus()));
   if (command === "online") return message.reply(controller.formatOnline(await controller.liveStatus()));
   if (command === "whitelist" && !["add", "remove", "rm", "clear"].includes((parts[2] || "").toLowerCase())) return message.reply(controller.formatWhitelist(await controller.liveStatus()));
-  if (command === "help") return message.reply(["**SMC command deck**", pick("help"), "`smc start` — start Minecraft", "`smc stop` — stop only when empty", "`smc restart` — restart Minecraft", "`smc status` — live status", "`smc health` — health snapshot", "`smc online` — players online", "`smc address` — live Playit address", "`smc logs` — recent Minecraft log", "`smc say <message>` — announce in Minecraft", "`smc kick <player>` — kick a player", "`smc ban <player>` / `smc pardon <player>` — ban controls", "`smc op <player>` / `smc deop <player>` — operator controls", "`smc whitelist` / `smc whitelist add/remove/clear` — whitelist file controls (enforcement stays OFF)", "`smc save` — save the world", "`smc admin` — permissions, lock, audit and admin controls"].join("\n"));
-  if (!canControl(message.member)) return message.reply("╭━━━ 🔒 **CONTROL ACCESS REQUIRED** ━━━╮\\nYou need the configured SMC control role or admin role.\\n╰━━━━━━━━━━━━━━━━━━━━━━╯");
-  if (locked) return message.reply("🔒 **SMC controls are locked.**\\nAn admin must use `smc admin unlock` before commands can run.");
+  if (command === "help") return message.reply([
+    "╭━━━ **✦ SMC COMMAND DECK ✦** ━━━╮",
+    `**${pick("help")}**`,
+    "",
+    "**WORLD CONTROL**",
+    "`smc start` — start Minecraft",
+    "`smc stop` — stop when the server is empty",
+    "`smc restart` — safely restart Minecraft",
+    "",
+    "**STATUS & INFO**",
+    "`smc status` — live server status",
+    "`smc health` — health snapshot",
+    "`smc online` — players currently online",
+    "`smc address` — live Playit address",
+    "`smc logs` — recent Minecraft log",
+    "`smc crash` — latest crash information",
+    "",
+    "**PLAYER & SERVER TOOLS**",
+    "`smc say <message>` — announce in Minecraft",
+    "`smc kick <player>` — kick a player",
+    "`smc ban <player>` / `smc pardon <player>` — ban controls",
+    "`smc op <player>` / `smc deop <player>` — operator controls",
+    "`smc whitelist` — view whitelist",
+    "`smc save` — save the world",
+    "",
+    "**ADMIN**",
+    "`smc admin` — permissions, lock and audit controls",
+    "╰━━━━━━━━━━━━━━━━━━━━━━╯"
+  ].join("\n"));
+  if (!canControl(message.member)) return message.reply("╭━━━ 🔒 **CONTROL ACCESS REQUIRED** ━━━╮\nYou need the configured SMC control role or admin role.\n╰━━━━━━━━━━━━━━━━━━━━━━╯");
+  if (locked) return message.reply("🔒 **SMC controls are locked.**\nAn admin must use `smc admin unlock` before commands can run.");
   const name = parts[2];
   let working = null;
   try {
@@ -186,15 +214,15 @@ ${pick("stop")}`);
 ${pick("restart")}`);
       result = await controller.restartServer((text) => showState("Restarting", text));
     }
-    else if (command === "say") { const msg = parts.slice(2).join(" "); if (!msg) throw new Error("Usage: smc say <message>"); working = await message.reply("🟡 **SENDING TO MINECRAFT**\\nPassing your message through…"); result = await controller.say(msg); }
-    else if (command === "set") { if (!canAdmin(message.member)) throw new Error("Admin access required for server.properties."); const key = parts[2]; const value = parts.slice(3).join(" "); if (!key || !value) throw new Error("Usage: smc set <property> <value>"); if (["online-mode","white-list","enforce-whitelist","server-port"].includes(key)) throw new Error("That property is protected by SMC safety rules."); working = await message.reply("🟡 **UPDATING SERVER**\\nChanging `" + key + "`…"); result = await controller.propertySet(key, value); }
-    else if (command === "kick") { if (!canAdmin(message.member)) throw new Error("Admin access required for kick."); working = await message.reply("🟡 **Doing**\nKicking `" + name + "`…"); result = await controller.kick(name); }
-    else if (command === "ban") { if (!canAdmin(message.member)) throw new Error("Admin access required for ban."); working = await message.reply("🟡 **Doing**\nBanning `" + name + "`…"); result = await controller.ban(name); }
-    else if (command === "pardon" || command === "unban") { if (!canAdmin(message.member)) throw new Error("Admin access required for unban."); working = await message.reply("🟡 **Doing**\nRemoving the ban for `" + name + "`…"); result = await controller.pardon(name); }
-    else if (command === "op") { if (!canAdmin(message.member)) throw new Error("Admin access required for op."); working = await message.reply("🟡 **Doing**\nGiving `" + name + "` operator access…"); result = await controller.op(name); }
-    else if (command === "deop") { if (!canAdmin(message.member)) throw new Error("Admin access required for deop."); working = await message.reply("🟡 **Doing**\nRemoving operator access from `" + name + "`…"); result = await controller.deop(name); }
-    else if (command === "save") { working = await message.reply("🟡 **Doing**\nSaving the world…"); result = await controller.save(); }
-    else if (command === "whitelist") { const sub = (parts[2] || "list").toLowerCase(); if (sub === "add") { working = await message.reply("🟡 **Doing**\nAdding `" + parts[3] + "` to the whitelist file…"); result = await controller.whitelistAdd(parts[3]); } else if (sub === "remove" || sub === "rm") { working = await message.reply("🟡 **Doing**\nRemoving `" + parts[3] + "` from the whitelist file…"); result = await controller.whitelistRemove(parts[3]); } else if (sub === "clear") { working = await message.reply("🟡 **Doing**\nClearing the whitelist file…"); result = await controller.whitelistClear(); } else return message.reply(controller.formatWhitelist(await controller.liveStatus())); }
+    else if (command === "say") { const msg = parts.slice(2).join(" "); if (!msg) throw new Error("Usage: smc say <message>"); working = await message.reply("🟡 **SENDING TO MINECRAFT**\nPassing your message through…"); result = await controller.say(msg); }
+    else if (command === "set") { if (!canAdmin(message.member)) throw new Error("Admin access required for server.properties."); const key = parts[2]; const value = parts.slice(3).join(" "); if (!key || !value) throw new Error("Usage: smc set <property> <value>"); if (["online-mode","white-list","enforce-whitelist","server-port"].includes(key)) throw new Error("That property is protected by SMC safety rules."); working = await message.reply("🟡 **UPDATING SERVER**\nChanging `" + key + "`…"); result = await controller.propertySet(key, value); }
+    else if (command === "kick") { if (!canAdmin(message.member)) throw new Error("Admin access required for kick."); working = await message.reply("🟡 **KICKING PLAYER**\nKicking `" + name + "`…"); result = await controller.kick(name); }
+    else if (command === "ban") { if (!canAdmin(message.member)) throw new Error("Admin access required for ban."); working = await message.reply("🟡 **BANNING PLAYER**\nBanning `" + name + "`…"); result = await controller.ban(name); }
+    else if (command === "pardon" || command === "unban") { if (!canAdmin(message.member)) throw new Error("Admin access required for unban."); working = await message.reply("🟡 **REMOVING BAN**\nRemoving the ban for `" + name + "`…"); result = await controller.pardon(name); }
+    else if (command === "op") { if (!canAdmin(message.member)) throw new Error("Admin access required for op."); working = await message.reply("🟡 **GRANTING OPERATOR**\nGiving `" + name + "` operator access…"); result = await controller.op(name); }
+    else if (command === "deop") { if (!canAdmin(message.member)) throw new Error("Admin access required for deop."); working = await message.reply("🟡 **REMOVING OPERATOR**\nRemoving operator access from `" + name + "`…"); result = await controller.deop(name); }
+    else if (command === "save") { working = await message.reply("🟡 **SAVING WORLD**\nSaving the world…"); result = await controller.save(); }
+    else if (command === "whitelist") { const sub = (parts[2] || "list").toLowerCase(); if (sub === "add") { working = await message.reply("🟡 **UPDATING WHITELIST**\nAdding `" + parts[3] + "` to the whitelist file…"); result = await controller.whitelistAdd(parts[3]); } else if (sub === "remove" || sub === "rm") { working = await message.reply("🟡 **UPDATING WHITELIST**\nRemoving `" + parts[3] + "` from the whitelist file…"); result = await controller.whitelistRemove(parts[3]); } else if (sub === "clear") { working = await message.reply("🟡 **CLEARING WHITELIST**\nClearing the whitelist file…"); result = await controller.whitelistClear(); } else return message.reply(controller.formatWhitelist(await controller.liveStatus())); }
     else if (command === "command") { if (!canAdmin(message.member)) return message.reply("👑 **Admin access required for arbitrary Minecraft commands.**"); const raw = parts.slice(2).join(" "); if (!raw) throw new Error("Usage: smc command <minecraft command>"); working = await message.reply("🟡 **Doing**\nRunning `" + raw + "`…"); result = await controller.command(raw); }
 
     record(message, parts.slice(1).join(" "), "completed");
@@ -204,7 +232,7 @@ ${pick("restart")}`);
 ${pick("online")}
 
 ${format(result)}`);
-      if (command === "stop") return working.edit("🔴 **SMC IS OFFLINE**\\nThe server has been shut down safely.");
+      if (command === "stop") return working.edit("🔴 **SMC IS OFFLINE**\nThe server has been shut down safely.");
       if (command === "restart") return working.edit(`🟢 **Restarted**
 ${pick("online")}
 
@@ -217,7 +245,7 @@ ${format(result)}`);
         : "";
 
       if (output) {
-        return working.edit("🟢 **ACTION COMPLETE**\\n```\\n" + output + "\\n```").catch(() => {});
+        return working.edit("🟢 **ACTION COMPLETE**\n```\n" + output + "\n```").catch(() => {});
       }
 
       const label = command === "set" ? "Updated " + parts[2] :
@@ -232,15 +260,15 @@ ${format(result)}`);
         command === "command" ? "Minecraft command completed" :
         "Action completed";
 
-      return working.edit("🟢 **ACTION COMPLETE**\\n" + label + ".").catch(() => {});
+      return working.edit("🟢 **ACTION COMPLETE**\n" + label + ".").catch(() => {});
     }
 
-    return message.reply(`🟢 **ACTION COMPLETE**\\n${parts.slice(1).join(" ")} completed successfully.`);
+    return message.reply(`🟢 **ACTION COMPLETE**\n${parts.slice(1).join(" ")} completed successfully.`);
   } catch (error) {
     record(message, parts.slice(1).join(" "), "error");
     const errorText = String(error.message || error).replace(/\\`/g, "'");
-    if (working) return working.edit("🔴 **ACTION FAILED**\\n`" + errorText + "`").catch(() => {});
-    return message.reply("🔴 **SMC ACTION FAILED**\\n`" + errorText + "`");
+    if (working) return working.edit("🔴 **ACTION FAILED**\n`" + errorText + "`").catch(() => {});
+    return message.reply("🔴 **SMC ACTION FAILED**\n`" + errorText + "`");
   }
 }
 client.on("messageCreate", async message => {
@@ -271,8 +299,8 @@ setInterval(async () => {
     const compact = [s.codespace, s.minecraft, s.playit, s.publicAddress, s.players?.online ?? null].join("|");
     if (monitorSnapshot && compact !== monitorSnapshot) {
       const old = monitorSnapshot.split("|");
-      if (s.minecraft !== old[1] && s.minecraft === "running") await notify("╭━━━ 🟢 **SMARTIES IS ONLINE** ━━━╮\\nThe Minecraft world is back up and ready.\\n╰━━━━━━━━━━━━━━━━━━━━━━╯");
-      if (s.publicAddress && s.publicAddress !== old[3]) await notify(`╭━━━ 🌐 **SERVER ADDRESS** ━━━╮\\n\\${s.publicAddress}\\n╰━━━━━━━━━━━━━━━━━━━━━━╯`);
+      if (s.minecraft !== old[1] && s.minecraft === "running") await notify("╭━━━ 🟢 **SMARTIES IS ONLINE** ━━━╮\nThe Minecraft world is back up and ready.\n╰━━━━━━━━━━━━━━━━━━━━━━╯");
+      if (s.publicAddress && s.publicAddress !== old[3]) await notify(`╭━━━ 🌐 **SERVER ADDRESS** ━━━╮\n\\${s.publicAddress}\n╰━━━━━━━━━━━━━━━━━━━━━━╯`);
     }
 
     if (s.crashed) {
@@ -284,12 +312,12 @@ setInterval(async () => {
         await notify(`🚨 **Minecraft just crashed.**\nExit code: **${s.lastExit ?? "unknown"}**\nI’m going to try bringing it back up (attempt ${crashRecovery.attempts}/${config.crashMaxRetries}).\n\nLast few log lines:\n\`\`\`\n${(s.logTail || []).slice(-8).join("\n").slice(-1800)}\n\`\`\``);
         try {
           await controller.restartServer();
-          await notify("🟢 **RECOVERY COMPLETE**\\nMinecraft started successfully after the crash.");
+          await notify("🟢 **RECOVERY COMPLETE**\nMinecraft started successfully after the crash.");
         } catch (error) {
-          await notify(`⚠️ **AUTOMATIC RECOVERY FAILED**\\n\\${error.message}\\n\\nAutomatic retries have been stopped to prevent a restart loop.`);
+          await notify(`⚠️ **AUTOMATIC RECOVERY FAILED**\n\\${error.message}\n\nAutomatic retries have been stopped to prevent a restart loop.`);
         }
       } else if (crashRecovery.attempts >= config.crashMaxRetries && Date.now() - crashRecovery.lastAttemptAt >= config.crashCooldownMs) {
-        await notify("🛑 **RECOVERY STOPPED**\\nMinecraft crashed again, so automatic restarts have been paused.\\n\\nUse `smc crash` and `smc logs` to investigate.");
+        await notify("🛑 **RECOVERY STOPPED**\nMinecraft crashed again, so automatic restarts have been paused.\n\nUse `smc crash` and `smc logs` to investigate.");
         crashRecovery.lastAttemptAt = Date.now();
       }
     }
@@ -299,8 +327,8 @@ setInterval(async () => {
       if (!emptySince) emptySince = Date.now();
       const idleMs = config.idleMinutes * 60 * 1000;
       if (idleMs > 0 && Date.now() - emptySince >= idleMs && !controller.operation()) {
-        await notify(`🛌 **IDLE SHUTDOWN**\\nNo players have been online for **${config.idleMinutes} minutes**.\\nSMC is shutting the world down safely.`);
-        try { await controller.stopServer(); } catch (error) { await notify("⚠️ **IDLE SHUTDOWN BLOCKED**\\n" + error.message); }
+        await notify(`🛌 **IDLE SHUTDOWN**\nNo players have been online for **${config.idleMinutes} minutes**.\nSMC is shutting the world down safely.`);
+        try { await controller.stopServer(); } catch (error) { await notify("⚠️ **IDLE SHUTDOWN BLOCKED**\n" + error.message); }
         emptySince = null;
       }
     } else emptySince = null;
