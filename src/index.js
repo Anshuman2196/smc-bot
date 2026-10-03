@@ -31,14 +31,14 @@ const adminState = {
 };
 
 const adminHelp = () => [
-  "**SMC • Admin**",
+  "**Smarties • Admin Controls**",
     "",
-  "`smc admin` — current configuration",
-  "`smc admin channel add/remove/list` — channel access",
-  "`smc admin role add/remove/list` — control roles",
-  "`smc admin adminrole set/clear/list` — admin role",
-  "`smc admin lock/unlock` — lock controls",
-  "`smc admin audit` — recent actions"
+  "⚙️ `smc admin` — view configuration",
+  "📍 `smc admin channel add/remove/list` — channel access",
+  "🎮 `smc admin role add/remove/list` — control roles",
+  "👑 `smc admin adminrole set/clear/list` — admin role",
+  "🔒 `smc admin lock/unlock` — lock or unlock controls",
+  "🧾 `smc admin audit` — recent actions"
 ].join("\n");
 
 async function handleAdmin(message, parts) {
@@ -50,7 +50,7 @@ async function handleAdmin(message, parts) {
   const ref = target === "channel" ? message.mentions.channels.first() : message.mentions.roles.first();
 
   if (target === "help" || target === "status") {
-    return message.reply(adminHelp() + "\n\n**Current:**\n" +
+    return message.reply(adminHelp() + "\n\n**Current configuration**\n\n" +
       "Channels: " + (adminState.allowedChannelIds.length ? adminState.allowedChannelIds.map(id => `<#${id}>`).join(", ") : "All channels") + "\n" +
       "Control roles: " + (adminState.controlRoleIds.length ? adminState.controlRoleIds.map(id => `<@&${id}>`).join(", ") : "Anyone, because none are configured") + "\n" +
       "Admin roles: " + (adminState.adminRoleIds.length ? adminState.adminRoleIds.map(id => `<@&${id}>`).join(", ") : "None configured"));
@@ -149,14 +149,14 @@ async function handle(message, parts) {
   if (command === "online") return message.reply(controller.formatOnline(await controller.liveStatus()));
   if (command === "whitelist" && !["add", "remove", "rm", "clear"].includes((parts[2] || "").toLowerCase())) return message.reply(controller.formatWhitelist(await controller.liveStatus()));
   if (command === "help") return message.reply([
-    "**Smarties • SMC**",
+    "**Smarties • Commands**",
     "",
-    "**Server**",
+    "🟢 **Server**",
     "`smc start` — start Minecraft",
     "`smc stop` — stop when empty",
     "`smc restart` — restart safely",
     "",
-    "**Info**",
+    "📊 **Information**",
     "`smc status` — server status",
     "`smc online` — players online",
     "`smc health` — health check",
@@ -164,7 +164,7 @@ async function handle(message, parts) {
     "`smc logs` — recent log",
     "`smc crash` — crash details",
     "",
-  "**Players**",
+    "👥 **Players**",
   "`smc say <message>`",
   "`smc kick <player>`",
   "`smc ban <player>` / `smc pardon <player>`",
@@ -172,8 +172,8 @@ async function handle(message, parts) {
     "`smc whitelist`",
     "`smc save`",
     "",
-    "`smc admin` — admin controls"
-  ].join("\n"));
+    "⚙️ `smc admin` — admin controls"
+  ].join("\n\n"));
   if (!canControl(message.member)) return message.reply("🔒 **Control access required.**");
   if (locked) return message.reply("🔒 **SMC controls are locked.**");
   const name = parts[2];
