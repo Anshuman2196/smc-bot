@@ -8,6 +8,15 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
 });
 
+client.on("debug", info => console.log("[Discord debug]", info));
+client.on("warn", info => console.warn("[Discord warn]", info));
+client.on("error", error => console.error("[Discord error]", error));
+client.on("shardError", (error, id) => console.error("[Discord shardError]", id, error));
+client.on("shardDisconnect", (event, id) => console.error("[Discord disconnect]", id, event?.code, event?.reason));
+client.on("shardReconnecting", id => console.log("[Discord reconnecting]", id));
+client.on("shardReady", (id, unavailableGuilds) => console.log("[Discord shardReady]", id, unavailableGuilds));
+client.on("invalidated", () => console.error("[Discord invalidated] Session invalidated"));
+
 const allowed = id =>
   !adminState.allowedChannelIds.length || adminState.allowedChannelIds.includes(id);
 
@@ -341,7 +350,17 @@ server.listen(config.httpPort, "0.0.0.0", () =>
 );
 
 client.once("ready", () => console.log(`Discord connected as ${client.user.tag}`));
-client.login(config.discordToken).catch(error => {
-  console.error("Discord login failed:", error);
+console.log("[Discord] Starting Gateway login...");
+client.login(config.discordToken).then(() => {
+  console.log("[Discord] login() resolved");
+}).catch(error => {
+  console.error("[Discord login failed]", error);
   process.exit(1);
 });
+
+setTimeout(() => {
+  if (!client.isReady()) {
+    console.error("[Discord] Gateway still not ready after 60s; exiting so Render can restart the service.");
+    process.exit(1);
+  }
+}, 60000);
