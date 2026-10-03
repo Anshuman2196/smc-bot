@@ -186,15 +186,15 @@ ${text}`;
     };
 
     if (command === "start") {
-      working = await message.reply(`🟡 **Starting Minecraft…**\\n${text}`);
+      working = await message.reply("🟡 **Starting Minecraft…**");
       result = await controller.startServer((text) => showState("Starting", text));
     }
     else if (command === "stop") {
-      working = await message.reply(`🟡 **Stopping Minecraft…**\\n${text}`);
+      working = await message.reply("🟡 **Stopping Minecraft…**");
       result = await controller.stopServer((text) => showState("Stopping", text));
     }
     else if (command === "restart") {
-      working = await message.reply(`🟡 **Restarting Minecraft…**\\n${text}`);
+      working = await message.reply("🟡 **Restarting Minecraft…**");
       result = await controller.restartServer((text) => showState("Restarting", text));
     }
     else if (command === "say") { const msg = parts.slice(2).join(" "); if (!msg) throw new Error("Usage: smc say <message>"); working = await message.reply("🟡 **SENDING TO MINECRAFT**\nPassing your message through…"); result = await controller.say(msg); }
