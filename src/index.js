@@ -182,6 +182,7 @@ async function handle(message, parts) {
     let result;
     const showState = async (title, text) => {
       const body = `🟡 **${title}**
+
 ${text}`;
       if (working) await working.edit(body).catch(() => {});
     };
