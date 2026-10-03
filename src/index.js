@@ -277,7 +277,7 @@ setInterval(async () => {
     if (monitorSnapshot && compact !== monitorSnapshot) {
       const old = monitorSnapshot.split("|");
       if (s.minecraft !== old[1] && s.minecraft === "running") await notify("🟢 **Smarties is online.**\nThe Minecraft world is back up and ready.");
-      if (s.publicAddress && s.publicAddress !== old[3]) await notify(`🌐 **Smarties • Server Address**\n\\`${s.publicAddress}\\``);
+      if (s.publicAddress && s.publicAddress !== old[3]) await notify("🌐 **Smarties • Server Address**\n`" + s.publicAddress + "`");
     }
 
     if (s.crashed) {
