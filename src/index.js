@@ -116,23 +116,24 @@ const statusIcon = value => ({
 }[String(value).toLowerCase()] || "⚪");
 
 const format = s => {
-  const playerCount = `${s.players?.online ?? "—"}/${s.players?.max ?? s.maxPlayers ?? "—"}`;
+  const playerCount = `${s.players?.online ?? "—"} / ${s.players?.max ?? s.maxPlayers ?? "—"}`;
   return [
     "**Smarties • Server Status**",
-    `${statusIcon(s.minecraft)} Minecraft  •  **${s.minecraft}**`,
-    `${statusIcon(s.codespace)} Codespace  •  **${s.codespace}**`,
-    `${statusIcon(s.agent)} Agent      •  **${s.agent}**`,
-    `${statusIcon(s.playit)} Playit     •  **${s.playit}**`,
     "",
-    `Players  **${playerCount}**`,
-    `Uptime   **${uptime(s.uptimeSec)}**`,
-    `Address  ${s.publicAddress ? "[" + s.publicAddress + "]" : "**not available**"}`,
-    s.error ? `⚠️ **Error:** ${s.error}` : ""
+    `${statusIcon(s.minecraft)} **Minecraft** — ${s.minecraft}`,
+    `${statusIcon(s.codespace)} **Codespace** — ${s.codespace}`,
+    `${statusIcon(s.agent)} **Agent** — ${s.agent}`,
+    `${statusIcon(s.playit)} **Playit** — ${s.playit}`,
+    "",
+    `👥 **Players** — ${playerCount}`,
+    `⏱️ **Uptime** — ${uptime(s.uptimeSec)}`,
+    s.publicAddress ? "🌐 **Address**\n`" + s.publicAddress + "`" : "🌐 **Address** — not available",
+    s.error ? `⚠️ **Error** — ${s.error}` : ""
   ].filter(Boolean).join("\n");
 };
 
 async function progress(message, text) {
-  await message.edit(`🟡 **SMC**\n${text}`).catch(() => {});
+  await message.edit(`🟡 **SMC**\n\n${text}`).catch(() => {});
 }
 
 async function handle(message, parts) {
@@ -186,18 +187,18 @@ ${text}`;
     };
 
     if (command === "start") {
-      working = await message.reply("🟡 **Starting Minecraft…**");
+      working = await message.reply("🟡 **Starting Minecraft**\n\nGetting the world online…");
       result = await controller.startServer((text) => showState("Starting", text));
     }
     else if (command === "stop") {
-      working = await message.reply("🟡 **Stopping Minecraft…**");
+      working = await message.reply("🟡 **Stopping Minecraft**\n\nWaiting for a safe shutdown…");
       result = await controller.stopServer((text) => showState("Stopping", text));
     }
     else if (command === "restart") {
-      working = await message.reply("🟡 **Restarting Minecraft…**");
+      working = await message.reply("🟡 **Restarting Minecraft**\n\nBringing the world back up safely…");
       result = await controller.restartServer((text) => showState("Restarting", text));
     }
-    else if (command === "say") { const msg = parts.slice(2).join(" "); if (!msg) throw new Error("Usage: smc say <message>"); working = await message.reply("🟡 **SENDING TO MINECRAFT**\nPassing your message through…"); result = await controller.say(msg); }
+    else if (command === "say") { const msg = parts.slice(2).join(" "); if (!msg) throw new Error("Usage: smc say <message>"); working = await message.reply("🟡 **Sending to Minecraft**\n\nPassing your message through…"); result = await controller.say(msg); }
     else if (command === "set") { if (!canAdmin(message.member)) throw new Error("Admin access required for server.properties."); const key = parts[2]; const value = parts.slice(3).join(" "); if (!key || !value) throw new Error("Usage: smc set <property> <value>"); if (["online-mode","white-list","enforce-whitelist","server-port"].includes(key)) throw new Error("That property is protected by SMC safety rules."); working = await message.reply("🟡 **UPDATING SERVER**\nChanging `" + key + "`…"); result = await controller.propertySet(key, value); }
     else if (command === "kick") { if (!canAdmin(message.member)) throw new Error("Admin access required for kick."); working = await message.reply("🟡 **KICKING PLAYER**\nKicking `" + name + "`…"); result = await controller.kick(name); }
     else if (command === "ban") { if (!canAdmin(message.member)) throw new Error("Admin access required for ban."); working = await message.reply("🟡 **BANNING PLAYER**\nBanning `" + name + "`…"); result = await controller.ban(name); }
@@ -211,9 +212,9 @@ ${text}`;
     record(message, parts.slice(1).join(" "), "completed");
 
     if (working) {
-      if (command === "start") return working.edit(`🟢 **Minecraft is online.**\n${format(result)}`);
-      if (command === "stop") return working.edit("⚫ **Minecraft is offline.**\nThe server was stopped safely.");
-      if (command === "restart") return working.edit(`🟢 **Minecraft restarted.**\n${format(result)}`);
+      if (command === "start") return working.edit(`🟢 **Minecraft is online**\n\n${format(result)}`);
+      if (command === "stop") return working.edit("⚫ **Minecraft is offline**\n\nThe server was stopped safely.");
+      if (command === "restart") return working.edit(`🟢 **Minecraft restarted**\n\n${format(result)}`);
     }
 
     if (working) {
@@ -222,7 +223,7 @@ ${text}`;
         : "";
 
       if (output) {
-        return working.edit("🟢 **ACTION COMPLETE**\n```\n" + output + "\n```").catch(() => {});
+        return working.edit("🟢 **Action complete**\n\n```\n" + output + "\n```").catch(() => {});
       }
 
       const label = command === "set" ? "Updated " + parts[2] :
@@ -237,15 +238,15 @@ ${text}`;
         command === "command" ? "Minecraft command completed" :
         "Action completed";
 
-      return working.edit(`🟢 **Done.**\n${label}.`).catch(() => {});
+      return working.edit(`🟢 **Done**\n\n${label}.`).catch(() => {});
     }
 
-    return message.reply(`🟢 **Done.**\n${parts.slice(1).join(" ")} completed successfully.`);
+    return message.reply(`🟢 **Done**\n\n${parts.slice(1).join(" ")} completed successfully.`);
   } catch (error) {
     record(message, parts.slice(1).join(" "), "error");
     const errorText = String(error.message || error).replace(/\\`/g, "'");
-    if (working) return working.edit(`🔴 **Failed.**\n${errorText}`).catch(() => {});
-    return message.reply(`🔴 **Failed.**\n${errorText}`);
+    if (working) return working.edit(`🔴 **Action failed**\n\n${errorText}`).catch(() => {});
+    return message.reply(`🔴 **Action failed**\n\n${errorText}`);
   }
 }
 client.on("messageCreate", async message => {
@@ -259,7 +260,7 @@ client.on("messageCreate", async message => {
   try {
     await handle(message, parts);
   } catch (error) {
-    await message.reply(`⚠️ **SMC error**\n${error.message || "SMC request failed."}`).catch(() => {});
+    await message.reply(`⚠️ **SMC error**\n\n${error.message || "SMC request failed."}`).catch(() => {});
   }
 });
 
@@ -276,8 +277,8 @@ setInterval(async () => {
     const compact = [s.codespace, s.minecraft, s.playit, s.publicAddress, s.players?.online ?? null].join("|");
     if (monitorSnapshot && compact !== monitorSnapshot) {
       const old = monitorSnapshot.split("|");
-      if (s.minecraft !== old[1] && s.minecraft === "running") await notify("🟢 **Smarties is online.**\nThe Minecraft world is back up and ready.");
-      if (s.publicAddress && s.publicAddress !== old[3]) await notify("🌐 **Smarties • Server Address**\n`" + s.publicAddress + "`");
+      if (s.minecraft !== old[1] && s.minecraft === "running") await notify("🟢 **Smarties is online**\n\nThe Minecraft world is back up and ready.");
+      if (s.publicAddress && s.publicAddress !== old[3]) await notify("🌐 **Smarties • Minecraft Address**\n\n`" + s.publicAddress + "`");
     }
 
     if (s.crashed) {
