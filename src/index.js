@@ -272,10 +272,27 @@ async function notify(text) {
 let monitorSnapshot = null;
 let emptySince = null;
 let crashRecovery = { key: null, attempts: 0, lastAttemptAt: 0 };
+let lastCodespaceKeepaliveAt = 0;
 setInterval(async () => {
   try {
     const s = await controller.liveStatus();
     const compact = [s.codespace, s.minecraft, s.playit, s.publicAddress, s.players?.online ?? null].join("|");
+
+    // Keep the Codespace active while real players are online. GitHub documents
+    // terminal output as activity for idle-timeout purposes; the harmless
+    // Minecraft `list` command produces console output without affecting gameplay.
+    const keepaliveMs = config.codespaceKeepaliveMinutes * 60 * 1000;
+    if (s.minecraft === "running" && s.players?.online > 0 && agent.connected() &&
+        Date.now() - lastCodespaceKeepaliveAt >= keepaliveMs) {
+      try {
+        agent.command("list");
+        lastCodespaceKeepaliveAt = Date.now();
+      } catch (error) {
+        console.error("Codespace player keepalive failed:", error.message);
+      }
+    } else if (s.players?.online === 0 || s.minecraft !== "running") {
+      lastCodespaceKeepaliveAt = 0;
+    }
 
     if (!controller.operation() && agent.info().desiredMinecraft === "running" &&
         (s.codespace !== "online" || s.agent !== "online" || s.minecraft !== "running")) {
