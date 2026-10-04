@@ -64,6 +64,50 @@ async function stopServer(report = async () => {}) {
     return { stopped: true };
   } finally { operation = null; }
 }
+async function recoverServer(report = async () => {}) {
+  if (operation) return liveStatus();
+  if (agent.info().desiredMinecraft !== "running") return liveStatus();
+
+  const state = await github.state();
+  if (state !== "Available") {
+    operation = "recovering";
+    try {
+      await report("Minecraft is still expected to be running. Recovering the Codespace…");
+      await ensureCodespace(report);
+      await ensureAgent(report);
+      await waitFor("Minecraft recovery", () => agent.status().minecraft === "running", config.startTimeoutMs, report, 2000);
+      return liveStatus();
+    } finally {
+      operation = null;
+    }
+  }
+
+  if (!agent.connected()) {
+    operation = "recovering";
+    try {
+      await report("Codespace is online, but the SMC agent is offline. Waiting for recovery…");
+      await ensureAgent(report);
+      await waitFor("Minecraft recovery", () => agent.status().minecraft === "running", config.startTimeoutMs, report, 2000);
+      return liveStatus();
+    } finally {
+      operation = null;
+    }
+  }
+
+  const current = agent.status();
+  if (current.minecraft !== "running") {
+    operation = "recovering";
+    try {
+      await report("Minecraft is offline while SMC still expects it to be running. Restarting…");
+      agent.restart();
+      await waitFor("Minecraft recovery", () => agent.status().minecraft === "running", config.startTimeoutMs + config.stopTimeoutMs, report, 2000);
+    } finally {
+      operation = null;
+    }
+  }
+
+  return liveStatus();
+}
 async function restartServer(report = async () => {}) {
   if (operation) throw new Error(`SMC is already ${operation}.`); cooldown(); operation = "restarting";
   try {
@@ -158,7 +202,7 @@ function formatAddress(s) {
     : "🌐 **Playit address is not available yet.**\nStart Minecraft and wait for the tunnel to connect.";
 }
 module.exports = {
-  liveStatus, startServer, stopServer, restartServer, formatOnline, formatWhitelist, formatHealth, formatLogs, formatCrash, formatAddress,
+  liveStatus, startServer, stopServer, restartServer, recoverServer, formatOnline, formatWhitelist, formatHealth, formatLogs, formatCrash, formatAddress,
   operation: () => operation,
   kick: name => minecraftAction(agent.kick, [name]), ban: name => minecraftAction(agent.ban, [name]), pardon: name => minecraftAction(agent.pardon, [name]),
   op: name => minecraftAction(agent.op, [name]), deop: name => minecraftAction(agent.deop, [name]),
