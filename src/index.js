@@ -43,7 +43,7 @@ const adminHelp = () => [
 
 async function handleAdmin(message, parts) {
   if (!canAdmin(message.member))
-    return message.reply("🔒 **SMC admin access required.**\nYou need the configured admin role or admin user ID.");
+    return message.reply("🔒 **SMC admin access required**\nYou need the configured admin role or admin user ID.");
 
   const target = (parts[2] || "status").toLowerCase();
   const action = (parts[3] || "list").toLowerCase();
@@ -62,7 +62,7 @@ async function handleAdmin(message, parts) {
 
   if (target === "channel") {
     if (action === "list") return message.reply("📍 **Allowed channels**\n" + (adminState.allowedChannelIds.length ? adminState.allowedChannelIds.map(id => `<#${id}>`).join("\n") : "All channels"));
-    if (!ref) return message.reply("⚠️ **Channel required.**\nMention the Discord channel you want to use.");
+    if (!ref) return message.reply("⚠️ **Channel required**\nMention the Discord channel you want to use.");
     if (action === "add") {
       if (!adminState.allowedChannelIds.includes(ref.id)) adminState.allowedChannelIds.push(ref.id);
       return message.reply(`✅ **Channel added**\n${ref} can now receive SMC commands.`);
@@ -75,7 +75,7 @@ async function handleAdmin(message, parts) {
 
   if (target === "role") {
     if (action === "list") return message.reply("🎮 **Control roles**\n" + (adminState.controlRoleIds.length ? adminState.controlRoleIds.map(id => `<@&${id}>`).join("\n") : "None — control is open to everyone."));
-    if (!ref) return message.reply("⚠️ Mention a role.");
+    if (!ref) return message.reply("⚠️ **Role required**\nMention a role.");
     if (action === "add") {
       if (!adminState.controlRoleIds.includes(ref.id)) adminState.controlRoleIds.push(ref.id);
       return message.reply(`✅ **Control role added**\n${ref} can now control SMC.`);
@@ -93,7 +93,7 @@ async function handleAdmin(message, parts) {
       return message.reply("✅ **Admin role cleared.**\nInitial access remains available through `ADMIN_USER_IDS`.");
     }
     if (action === "set") {
-      if (!ref) return message.reply("⚠️ Mention a role.");
+      if (!ref) return message.reply("⚠️ **Role required**\nMention a role.");
       adminState.adminRoleIds.splice(0, adminState.adminRoleIds.length, ref.id);
       return message.reply(`👑 **Admin role updated**\n${ref} is now the SMC admin role.`);
     }
@@ -308,7 +308,7 @@ setInterval(async () => {
     if (monitorSnapshot && compact !== monitorSnapshot) {
       const old = monitorSnapshot.split("|");
       if (s.minecraft !== old[1] && s.minecraft === "running") await notify("🟢 **Smarties is online**\n\nThe Minecraft world is back up and ready.");
-      if (s.publicAddress && s.publicAddress !== old[3]) await notify("🌐 **Smarties • Minecraft address**\n\n`" + s.publicAddress + "`");
+      if (s.publicAddress && s.publicAddress !== old[3]) await notify("🌐 **Smarties • Minecraft address**\n`" + s.publicAddress + "`");
     }
 
     if (s.crashed) {
@@ -317,15 +317,15 @@ setInterval(async () => {
       if (crashRecovery.attempts < config.crashMaxRetries && Date.now() - crashRecovery.lastAttemptAt >= config.crashCooldownMs && !controller.operation()) {
         crashRecovery.attempts += 1;
         crashRecovery.lastAttemptAt = Date.now();
-        await notify("🚨 **Minecraft just crashed.\nExit code: **" + (s.lastExit ?? "unknown") + "**\nI’m going to try bringing it back up (attempt " + crashRecovery.attempts + "/" + config.crashMaxRetries + ").\n\nLast few log lines:\n```\n" + (s.logTail || []).slice(-8).join("\n").slice(-1800) + "\n```");
+        await notify("🚨 **Minecraft crashed**\nExit code: `" + (s.lastExit ?? "unknown") + "`\nAttempting automatic recovery (" + crashRecovery.attempts + "/" + config.crashMaxRetries + ").\n\n**Recent log lines**\n```\n" + (s.logTail || []).slice(-8).join("\n").slice(-1800) + "\n```");
         try {
           await controller.restartServer();
           await notify("🟢 **Recovery complete**\nMinecraft started successfully after the crash.");
         } catch (error) {
-          await notify(`⚠️ **Automatic recovery failed**\n${error.message}\n\nAutomatic retries have been stopped to prevent a restart loop.`);
+          await notify(`⚠️ **Automatic recovery failed**\n${error.message}\nAutomatic retries are paused to prevent a restart loop.`);
         }
       } else if (crashRecovery.attempts >= config.crashMaxRetries && Date.now() - crashRecovery.lastAttemptAt >= config.crashCooldownMs) {
-        await notify("🛑 **Recovery paused**\nMinecraft crashed again, so automatic restarts have been paused.\n\nUse `smc crash` and `smc logs` to investigate.");
+        await notify("🛑 **Recovery paused**\nMinecraft crashed again, so automatic restarts are paused.\nUse `smc crash` and `smc logs` to investigate.");
         crashRecovery.lastAttemptAt = Date.now();
       }
     }
@@ -336,7 +336,7 @@ setInterval(async () => {
       const idleMs = config.idleMinutes * 60 * 1000;
       if (idleMs > 0 && Date.now() - emptySince >= idleMs && !controller.operation()) {
         await notify(`🛌 **Idle shutdown**\nNo players have been online for **${config.idleMinutes} minutes**.\nSMC is shutting the world down safely.`);
-        try { await controller.stopServer(); } catch (error) { await notify("⚠️ **Idle shutdown BLOCKED**\n" + error.message); }
+        try { await controller.stopServer(); } catch (error) { await notify("⚠️ **Idle shutdown blocked**\n" + error.message); }
         emptySince = null;
       }
     } else emptySince = null;
