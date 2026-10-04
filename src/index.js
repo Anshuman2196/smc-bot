@@ -173,7 +173,7 @@ async function handle(message, parts) {
     "`smc save`",
     "",
     "⚙️ `smc admin` — admin controls"
-  ].join("\n\n"));
+  ].join("\n");
   if (!canControl(message.member)) return message.reply("🔒 **Control access required.**");
   if (locked) return message.reply("🔒 **SMC controls are locked.**");
   const name = parts[2];
@@ -299,7 +299,7 @@ setInterval(async () => {
       try {
         const recovered = await controller.recoverServer();
         if (recovered.minecraft === "running" && s.minecraft !== "running") {
-          await notify("🟢 **SMC recovery complete**\n\nMinecraft was automatically recovered because SMC still expected the server to be running.");
+          await notify("🟢 **SMC recovery complete**\nMinecraft was automatically recovered because SMC still expected the server to be running.");
         }
       } catch (error) {
         console.error("SMC automatic recovery failed:", error.message);
@@ -307,7 +307,7 @@ setInterval(async () => {
     }
     if (monitorSnapshot && compact !== monitorSnapshot) {
       const old = monitorSnapshot.split("|");
-      if (s.minecraft !== old[1] && s.minecraft === "running") await notify("🟢 **Smarties is online**\n\nThe Minecraft world is back up and ready.");
+      if (s.minecraft !== old[1] && s.minecraft === "running") await notify("🟢 **Smarties is online**\nThe Minecraft world is back up and ready.");
       if (s.publicAddress && s.publicAddress !== old[3]) await notify("🌐 **Smarties • Minecraft address**\n`" + s.publicAddress + "`");
     }
 
