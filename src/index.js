@@ -176,7 +176,7 @@ async function handle(message, parts) {
     "`smc command <minecraft command>` — run any Minecraft command (admin)",
     "",
     "⚙️ `smc admin` — admin controls"
-  ].join("\n");
+  ].join("\n"));
   if (!canControl(message.member)) return message.reply("🔒 **Control access required.**");
   if (locked) return message.reply("🔒 **SMC controls are locked.**");
   const name = parts[2];
