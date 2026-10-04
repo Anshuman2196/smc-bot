@@ -279,6 +279,18 @@ setInterval(async () => {
   try {
     const s = await controller.liveStatus();
     const compact = [s.codespace, s.minecraft, s.playit, s.publicAddress, s.players?.online ?? null].join("|");
+
+    if (!controller.operation() && agent.info().desiredMinecraft === "running" &&
+        (s.codespace !== "online" || s.agent !== "online" || s.minecraft !== "running")) {
+      try {
+        const recovered = await controller.recoverServer();
+        if (recovered.minecraft === "running" && s.minecraft !== "running") {
+          await notify("🟢 **SMC RECOVERY COMPLETE**\n\nMinecraft was automatically recovered because SMC still expected the server to be running.");
+        }
+      } catch (error) {
+        console.error("SMC automatic recovery failed:", error.message);
+      }
+    }
     if (monitorSnapshot && compact !== monitorSnapshot) {
       const old = monitorSnapshot.split("|");
       if (s.minecraft !== old[1] && s.minecraft === "running") await notify("🟢 **Smarties is online**\n\nThe Minecraft world is back up and ready.");
