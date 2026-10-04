@@ -172,6 +172,9 @@ async function handle(message, parts) {
     "`smc whitelist`",
     "`smc save`",
     "",
+    "⚙️ **Minecraft commands**",
+    "`smc command <minecraft command>` — run any Minecraft command (admin)",
+    "",
     "⚙️ `smc admin` — admin controls"
   ].join("\n");
   if (!canControl(message.member)) return message.reply("🔒 **Control access required.**");
