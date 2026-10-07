@@ -5,7 +5,60 @@ const agent = require("./agent");
 const controller = require("./controller");
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
+  ]
+});
+
+// Discord Gateway diagnostics. Keep these enabled so authentication,
+// privileged-intent failures, disconnects, and reconnect loops are visible
+// in Render instead of looking like a silent login hang.
+client.on("error", error => {
+  console.error("[Discord] client error:", error?.stack || error);
+});
+
+client.on("warn", message => {
+  console.warn("[Discord] warning:", message);
+});
+
+client.on("debug", message => {
+  console.log("[Discord] debug:", message);
+});
+
+client.on("shardError", (error, shardId) => {
+  console.error(`[Discord] shard ${shardId} WebSocket error:`, error?.stack || error);
+});
+
+client.on("shardDisconnect", (closeEvent, shardId) => {
+  console.error(
+    `[Discord] shard ${shardId} disconnected:`,
+    JSON.stringify({
+      code: closeEvent?.code ?? null,
+      reason: closeEvent?.reason?.toString?.() ?? null,
+      wasClean: closeEvent?.wasClean ?? null
+    })
+  );
+});
+
+client.on("shardReconnecting", shardId => {
+  console.warn(`[Discord] shard ${shardId} reconnecting...`);
+});
+
+client.on("shardReady", (shardId, unavailableGuilds) => {
+  console.log(
+    `[Discord] shard ${shardId} ready; unavailable guilds:`,
+    unavailableGuilds?.size ?? 0
+  );
+});
+
+process.on("unhandledRejection", reason => {
+  console.error("[Process] unhandled rejection:", reason?.stack || reason);
+});
+
+process.on("uncaughtException", error => {
+  console.error("[Process] uncaught exception:", error?.stack || error);
 });
 
 const allowed = id =>
@@ -365,8 +418,35 @@ server.listen(config.httpPort, "0.0.0.0", () =>
   console.log(`SMC control plane listening on ${config.httpPort}`)
 );
 
-client.once("ready", () => console.log(`Discord connected as ${client.user.tag}`));
-client.login(config.discordToken).catch(error => {
-  console.error("Discord login failed:", error);
-  process.exit(1);
+client.once("ready", () => {
+  console.log(
+    `[Discord] READY — connected as ${client.user.tag} (${client.user.id})`
+  );
 });
+
+async function connectDiscord() {
+  console.log("[Discord] Starting Gateway login...");
+  console.log("[Discord] DISCORD_TOKEN configured:", Boolean(config.discordToken));
+
+  const timeoutMs = 30000;
+  let timeout;
+  try {
+    await Promise.race([
+      client.login(config.discordToken),
+      new Promise((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error(`Discord Gateway login timed out after ${timeoutMs}ms; inspect [Discord] debug/disconnect logs above.`)),
+          timeoutMs
+        );
+      })
+    ]);
+    console.log("[Discord] login() completed; waiting for READY...");
+  } catch (error) {
+    console.error("[Discord] login failed:", error?.stack || error);
+    process.exit(1);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+connectDiscord();
