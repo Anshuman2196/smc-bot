@@ -24,7 +24,10 @@ client.on("warn", message => {
 });
 
 client.on("debug", message => {
-  console.log("[Discord] debug:", message);
+  const safe = String(message)
+    .replace(config.discordToken, "[REDACTED]")
+    .replace(/(Provided token:\s*)\S+/i, "$1[REDACTED]");
+  console.log("[Discord] debug:", safe);
 });
 
 client.on("shardError", (error, shardId) => {
@@ -424,9 +427,65 @@ client.once("ready", () => {
   );
 });
 
+async function discordPreflight() {
+  const timeoutMs = 10000;
+  const headers = {
+    Authorization: `Bot ${config.discordToken}`,
+    Accept: "application/json"
+  };
+
+  for (const [name, url] of [
+    ["users/@me", "https://discord.com/api/v10/users/@me"],
+    ["gateway/bot", "https://discord.com/api/v10/gateway/bot"]
+  ]) {
+    let response;
+    try {
+      response = await fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(timeoutMs)
+      });
+    } catch (error) {
+      throw new Error(`Discord preflight ${name} request failed: ${error.message}`);
+    }
+
+    const body = await response.text();
+    if (!response.ok) {
+      let detail = body;
+      try {
+        const parsed = JSON.parse(body);
+        detail = parsed.message || body;
+      } catch {}
+      throw new Error(`Discord preflight ${name} returned HTTP ${response.status}: ${detail}`);
+    }
+
+    if (name === "users/@me") {
+      try {
+        const user = JSON.parse(body);
+        console.log(`[Discord] REST authentication OK — bot user: ${user.username}#${user.discriminator || "0"} (${user.id})`);
+      } catch {
+        console.log("[Discord] REST authentication OK.");
+      }
+    } else {
+      try {
+        const gateway = JSON.parse(body);
+        console.log(`[Discord] Gateway endpoint OK — url available, recommended shards: ${gateway.shards ?? "unknown"}`);
+      } catch {
+        console.log("[Discord] Gateway endpoint OK.");
+      }
+    }
+  }
+}
+
 async function connectDiscord() {
   console.log("[Discord] Starting Gateway login...");
   console.log("[Discord] DISCORD_TOKEN configured:", Boolean(config.discordToken));
+
+  try {
+    await discordPreflight();
+  } catch (error) {
+    console.error("[Discord] PRECHECK FAILED:", error?.stack || error);
+    process.exit(1);
+  }
 
   const timeoutMs = 30000;
   let timeout;
