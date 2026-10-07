@@ -225,6 +225,8 @@ async function handle(message, parts) {
     "`smc restart` — restart safely",
     "`smc force-stop` — immediately stop SMC and cancel the current action",
     "`smc backup` — create an external recovery backup",
+    "`smc playit` — connect/check the Playit tunnel",
+    "`smc playit restart` — restart Playit when the server is empty",
     "",
     "📊 **Information**",
     "`smc status` — server status",
@@ -292,6 +294,18 @@ ${text}`;
       working = await message.reply("🟡 **Restarting Minecraft**\nBringing the world back up safely…");
       result = await controller.restartServer((text) => showState("Restarting", text));
     }
+    else if (command === "playit") {
+      const sub = (parts[2] || "ensure").toLowerCase();
+      if (sub !== "restart" && sub !== "ensure" && sub !== "status") throw new Error("Usage: smc playit [restart]");
+      if (sub === "status") return message.reply(controller.formatAddress(await controller.liveStatus()));
+      if (!canAdmin(message.member)) throw new Error("Admin access required for Playit control.");
+      working = await message.reply(sub === "restart"
+        ? "🟡 **Restarting Playit**\nReconnecting the public tunnel…"
+        : "🟡 **Connecting Playit**\nChecking the tunnel and starting it if needed…");
+      result = sub === "restart"
+        ? await controller.playitRestart((text) => showState("Playit", text))
+        : await controller.playitEnsure((text) => showState("Playit", text));
+    }
     else if (command === "say") { const msg = parts.slice(2).join(" "); if (!msg) throw new Error("Usage: smc say <message>"); working = await message.reply("🟡 **Sending to Minecraft**\nPassing your message through…"); result = await controller.say(msg); }
     else if (command === "set") { if (!canAdmin(message.member)) throw new Error("Admin access required for server.properties."); const key = parts[2]; const value = parts.slice(3).join(" "); if (!key || !value) throw new Error("Usage: smc set <property> <value>"); if (["online-mode","white-list","enforce-whitelist","server-port"].includes(key)) throw new Error("That property is protected by SMC safety rules."); working = await message.reply("🟡 **Updating server**\nChanging `" + key + "`…"); result = await controller.propertySet(key, value); }
     else if (command === "kick") { if (!canAdmin(message.member)) throw new Error("Admin access required for kick."); working = await message.reply("🟡 **Kicking player**\nKicking `" + name + "`…"); result = await controller.kick(name); }
@@ -330,6 +344,7 @@ ${text}`;
         command === "say" ? "Message sent" :
         command === "whitelist" ? "Whitelist updated" :
         command === "command" ? "Minecraft command completed" :
+        command === "playit" ? "Playit tunnel connected" :
         "Action completed";
 
       return working.edit(`🟢 **Done**\n${label}.`).catch(() => {});
