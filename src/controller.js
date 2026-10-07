@@ -47,6 +47,57 @@ async function liveStatus() {
   try { const s = agent.status(); Object.assign(result, { minecraft: s.minecraft || "unknown", processAlive: Boolean(s.processAlive), playit: s.playit || "unknown", publicAddress: s.publicAddress || null, minecraftPort: Boolean(s.minecraftPort), crashed: Boolean(s.crashed), lastStopReason: s.lastStopReason || "none", crashStreak: s.crashStreak || 0, lastCrashAt: s.lastCrashAt || null, lastExit: s.lastExit ?? null, lastActionResult: s.lastActionResult || null, logTail: Array.isArray(s.logTail) ? s.logTail : [], players: s.players || null, maxPlayers: s.players?.max ?? s.maxPlayers ?? null, uptimeSec: s.uptimeSec ?? null, whitelist: Array.isArray(s.whitelist) ? s.whitelist : [], serverProperties: s.serverProperties || {} }); } catch (e) { result.error = e.message; }
   return result;
 }
+async function ensurePlayit(report = async () => {}, token = cancellationGeneration, timeout = 90000) {
+  assertActive(token);
+  if (!agent.connected()) throw new Error("SMC agent is offline.");
+  const current = agent.status();
+  if (current.playit === "online" && current.publicAddress) return current;
+  await report("Minecraft is running. Connecting the Playit tunnel…");
+  agent.playitEnsure();
+  await waitFor("Playit tunnel", () => {
+    const status = agent.status();
+    return status.playit === "online" && Boolean(status.publicAddress);
+  }, timeout, report, 2000, token);
+  assertActive(token);
+  return agent.status();
+}
+
+async function playitEnsure(report = async () => {}) {
+  if (operation) throw new Error(`SMC is already ${operation}.`);
+  cooldown();
+  operation = "playit";
+  const token = cancellationGeneration;
+  try {
+    await ensurePlayit(report, token);
+    return liveStatus();
+  } finally {
+    operation = null;
+  }
+}
+
+async function playitRestart(report = async () => {}) {
+  if (operation) throw new Error(`SMC is already ${operation}.`);
+  cooldown();
+  operation = "playit-restarting";
+  const token = cancellationGeneration;
+  try {
+    assertActive(token);
+    if (!agent.connected()) throw new Error("SMC agent is offline.");
+    const current = agent.status();
+    if ((current.players?.online ?? 0) > 0) throw new Error("Playit restart is blocked while players are online because it will interrupt the tunnel.");
+    await report("Restarting the Playit tunnel…");
+    const item = agent.playitRestart();
+    await waitFor("Playit tunnel restart", () => {
+      const status = agent.status();
+      return status.playit === "online" && Boolean(status.publicAddress) &&
+        status.lastActionResult?.id === item.id;
+    }, 120000, report, 2000, token);
+    return liveStatus();
+  } finally {
+    operation = null;
+  }
+}
+
 async function startServer(report = async () => {}) {
   if (operation) throw new Error(`SMC is already ${operation}.`); cooldown(); operation = "starting";
   forceStopped = false;
@@ -59,6 +110,11 @@ async function startServer(report = async () => {}) {
     await ensureAgent(report, token);
     await waitFor("Minecraft", () => agent.status().minecraft === "running", config.startTimeoutMs, report, 2000, token);
     assertActive(token);
+    try {
+      await ensurePlayit(report, token);
+    } catch (error) {
+      throw new Error(`Minecraft is running, but Playit did not connect: ${error.message} Use \`smc playit\` to retry the tunnel.`);
+    }
     return liveStatus();
   } finally { operation = null; }
 }
@@ -223,8 +279,20 @@ async function backupServer(report = async () => {}) {
     await report("A backup is already in progress. Waiting for it to finish…");
     return backupInFlight;
   }
+  if (operation && operation !== "stopping") {
+    throw new Error(`SMC is already ${operation}. Wait for the current action to finish before backing up.`);
+  }
+  const ownOperation = !operation;
+  if (ownOperation) operation = "backing-up";
+
   backupInFlight = (async () => {
   const results = { codespace: null, files: null };
+  const current = await liveStatus();
+  if (current.agent !== "online") throw new Error("SMC agent is offline.");
+  if (current.minecraft !== "running" || !current.processAlive) {
+    throw new Error(`Minecraft is ${current.minecraft}. Backups are only allowed after Minecraft is fully RUNNING.`);
+  }
+  await report("Minecraft is fully RUNNING. Starting a consistent backup…");
   try {
     results.codespace = await github.exportCodespace();
     await report("Codespace changes exported to a recovery branch.");
@@ -253,6 +321,7 @@ async function backupServer(report = async () => {}) {
     return await backupInFlight;
   } finally {
     backupInFlight = null;
+    if (ownOperation) operation = null;
   }
 }
 async function requireLive() {
@@ -307,7 +376,7 @@ function formatAddress(s) {
     : "🌐 **Playit address unavailable**\nStart Minecraft and wait for the tunnel to connect.";
 }
 module.exports = {
-  liveStatus, startServer, stopServer, restartServer, recoverServer, backupServer, formatOnline, formatWhitelist, formatHealth, formatLogs, formatCrash, formatAddress,
+  liveStatus, startServer, stopServer, restartServer, recoverServer, backupServer, playitEnsure, playitRestart, formatOnline, formatWhitelist, formatHealth, formatLogs, formatCrash, formatAddress,
   operation: () => operation,
   forceStop,
   automaticRecoveryEnabled,
