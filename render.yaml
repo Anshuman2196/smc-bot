@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: smc-bot
+    runtime: node
+    plan: free
+    region: singapore
+    branch: main
+    rootDir: .
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: GH_PAT
+        sync: false
+      - key: CODESPACE_NAME
+        sync: false
+      - key: AGENT_TOKEN
+        sync: false
+      - key: PUBLIC_HOST
+        sync: false
+      - key: PUBLIC_PORT
+        value: "25565"
+      - key: IDLE_SHUTDOWN_MINUTES
+        value: "5"
