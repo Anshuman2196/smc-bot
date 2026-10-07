@@ -21,7 +21,8 @@ function info() { return { connected: connected(), ageMs: seenAt ? Date.now() - 
 function status() { if (!connected()) throw new Error("SMC agent is offline"); return state; }
 function action(type, args = {}) {
   if (!connected()) throw new Error("SMC agent is offline");
-  if (type !== "backup" && state.minecraft !== "running") throw new Error("Minecraft is not running");
+  const independent = new Set(["backup", "playit.ensure", "playit.restart"]);
+  if (!independent.has(type) && state.minecraft !== "running") throw new Error("Minecraft is not running");
   return enqueue(type, args);
 }
 async function waitForAction(id, timeoutMs = 15000) {
@@ -49,5 +50,7 @@ function say(message) { return action("say", { message }); }
 function command(command) { return action("command", { command }); }
 function save() { return action("save"); }
 function backup() { return action("backup"); }
+function playitEnsure() { return action("playit.ensure"); }
+function playitRestart() { return action("playit.restart"); }
 function propertySet(key, value) { return action("property.set", { key, value }); }
-module.exports = { authenticated, connected, sync, info, status, setDesired, restart, action, waitForAction, whitelistAdd, whitelistRemove, whitelistClear, kick, ban, pardon, op, deop, say, command, save, backup, propertySet };
+module.exports = { authenticated, connected, sync, info, status, setDesired, restart, action, waitForAction, whitelistAdd, whitelistRemove, whitelistClear, kick, ban, pardon, op, deop, say, command, save, backup, playitEnsure, playitRestart, propertySet };
