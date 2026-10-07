@@ -29,7 +29,7 @@ async function waitForAction(id, timeoutMs = 15000) {
   const end = Date.now() + timeoutMs;
   while (Date.now() < end) {
     if (!connected()) throw new Error("SMC agent went offline while completing the action.");
-    const result = state.lastActionResult;
+    const result = state.actionResults?.[id] || state.lastActionResult;
     if (result && result.id === id) {
       if (!result.ok) throw new Error(result.error || "Minecraft action failed.");
       return result;
