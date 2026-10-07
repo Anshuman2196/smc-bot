@@ -274,6 +274,9 @@ function formatWhitelist(s) {
 }
 
 let backupInFlight = null;
+let backupProgress = { active: false, stage: "idle", message: null, startedAt: null, updatedAt: null };
+function backupStatus() { return { ...backupProgress }; }
+function backupActive() { return Boolean(backupInFlight); }
 async function backupServer(report = async () => {}) {
   if (backupInFlight) {
     await report("A backup is already in progress. Waiting for it to finish…");
@@ -286,13 +289,15 @@ async function backupServer(report = async () => {}) {
   if (ownOperation) operation = "backing-up";
 
   backupInFlight = (async () => {
+  backupProgress = { active: true, stage: "checking", message: "Checking server and agent state…", startedAt: Date.now(), updatedAt: Date.now() };
+  const progress = async (stage, message) => { backupProgress = { ...backupProgress, active: true, stage, message, updatedAt: Date.now() }; await report(message); };
   const results = { codespace: null, files: null };
   const current = await liveStatus();
   if (current.agent !== "online") throw new Error("SMC agent is offline.");
   if (current.minecraft !== "running" || !current.processAlive) {
     throw new Error(`Minecraft is ${current.minecraft}. Backups are only allowed after Minecraft is fully RUNNING.`);
   }
-  await report("Minecraft is fully RUNNING. Starting a consistent backup…");
+  await progress("checking", "Minecraft is fully RUNNING. Starting a consistent backup…");
   // Never invoke the GitHub Codespaces export API while Minecraft is live.
   // The external archive below already captures the repository/server state
   // needed for SMC recovery without touching Codespace lifecycle state.
@@ -301,12 +306,12 @@ async function backupServer(report = async () => {}) {
     reason: "live_codespace_protected",
     message: "Codespace export skipped while Minecraft is running to prevent lifecycle interruption."
   };
-  await report("Live Codespace protected. Creating the external server/world backup…");
+  await progress("world", "Live Codespace protected. Creating the server/world backup…");
   try {
     if (agent.connected()) {
       const item = agent.backup();
       results.files = await agent.waitForAction(item.id, Math.max(config.backupTimeoutMs, config.commandTimeoutMs));
-      await report("Server/world backup uploaded to GitHub Releases.");
+      await progress("complete", "Server/world backup uploaded to GitHub Releases.");
     } else {
       results.files = { skipped: true, reason: "Minecraft is not running." };
     }
@@ -317,6 +322,7 @@ async function backupServer(report = async () => {}) {
   if (results.files?.error) {
     throw new Error(`Server/world backup failed: ${results.files.error || "unknown error"}`);
   }
+  await progress("complete", "Backup finished successfully.");
   return results;
   })();
   try {
@@ -324,6 +330,7 @@ async function backupServer(report = async () => {}) {
   } finally {
     backupInFlight = null;
     if (ownOperation) operation = null;
+    backupProgress = { ...backupProgress, active: false, updatedAt: Date.now() };
   }
 }
 async function requireLive() {
@@ -378,7 +385,7 @@ function formatAddress(s) {
     : "🌐 **Playit address unavailable**\nStart Minecraft and wait for the tunnel to connect.";
 }
 module.exports = {
-  liveStatus, startServer, stopServer, restartServer, recoverServer, backupServer, playitEnsure, playitRestart, formatOnline, formatWhitelist, formatHealth, formatLogs, formatCrash, formatAddress,
+  liveStatus, startServer, stopServer, restartServer, recoverServer, backupServer, backupStatus, backupActive, playitEnsure, playitRestart, formatOnline, formatWhitelist, formatHealth, formatLogs, formatCrash, formatAddress,
   operation: () => operation,
   forceStop,
   automaticRecoveryEnabled,
