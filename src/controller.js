@@ -4,26 +4,39 @@ const agent = require("./agent");
 
 let operation = null;
 let lastAction = 0;
+let cancellationGeneration = 0;
+let forceStopped = false;
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 function cooldown() { const left = config.actionCooldownMs - (Date.now() - lastAction); if (left > 0) throw new Error(`Please wait ${Math.ceil(left / 1000)}s before another SMC action.`); lastAction = Date.now(); }
-async function waitFor(label, fn, timeout, report, interval = 1500) {
+function assertActive(token) {
+  if (token !== cancellationGeneration) throw new Error("SMC operation was force-stopped.");
+}
+async function waitFor(label, fn, timeout, report, interval = 1500, token = cancellationGeneration) {
   const end = Date.now() + timeout;
-  while (Date.now() < end) { if (await fn()) return; await report(label); await sleep(interval); }
+  while (Date.now() < end) {
+    assertActive(token);
+    if (await fn()) return;
+    await report(label);
+    await sleep(interval);
+  }
+  assertActive(token);
   throw new Error(`Timed out waiting for ${label}.`);
 }
-async function ensureCodespace(report) {
+async function ensureCodespace(report, token) {
+  assertActive(token);
   let state = await github.state();
-  if (state === "ShuttingDown") await waitFor("previous Codespace shutdown", async () => ["Shutdown", "Archived"].includes(await github.state()), config.codespaceTimeoutMs, report, 2000);
+  if (state === "ShuttingDown") await waitFor("previous Codespace shutdown", async () => ["Shutdown", "Archived"].includes(await github.state()), config.codespaceTimeoutMs, report, 2000, token);
   state = await github.state();
-  if (["Shutdown", "Archived"].includes(state)) { await report("Starting Codespace…"); await github.start(); }
-  await waitFor("Codespace", async () => (await github.state()) === "Available", config.codespaceTimeoutMs, report, 2000);
+  assertActive(token);
+  if (["Shutdown", "Archived"].includes(state)) { await report("Starting Codespace…"); assertActive(token); await github.start(); }
+  await waitFor("Codespace", async () => (await github.state()) === "Available", config.codespaceTimeoutMs, report, 2000, token);
 }
-async function ensureAgent(report) {
+async function ensureAgent(report, token) {
   await waitFor("SMC agent", () => agent.connected(), config.startTimeoutMs, async () => {
     const i = agent.info();
     await report(i.ageMs == null ? "Waiting for the SMC agent to connect…" : `Agent heartbeat ${Math.ceil(i.ageMs / 1000)}s ago…`);
-  }, 1500);
+  }, 1500, token);
 }
 async function liveStatus() {
   const result = { codespace: "offline", agent: "offline", minecraft: "offline", processAlive: false, playit: "offline", publicAddress: null, players: null, maxPlayers: null, uptimeSec: null, crashed: false, lastActionResult: null, lastStopReason: "none", crashStreak: 0, lastCrashAt: null, lastExit: null, whitelist: [], error: null };
@@ -36,19 +49,25 @@ async function liveStatus() {
 }
 async function startServer(report = async () => {}) {
   if (operation) throw new Error(`SMC is already ${operation}.`); cooldown(); operation = "starting";
+  forceStopped = false;
+  const token = cancellationGeneration;
   try {
+    assertActive(token);
     agent.setDesired("running");
     await report("Minecraft desired state set to RUNNING.");
-    await ensureCodespace(report);
-    await ensureAgent(report);
-    await waitFor("Minecraft", () => agent.status().minecraft === "running", config.startTimeoutMs, report, 2000);
+    await ensureCodespace(report, token);
+    await ensureAgent(report, token);
+    await waitFor("Minecraft", () => agent.status().minecraft === "running", config.startTimeoutMs, report, 2000, token);
+    assertActive(token);
     return liveStatus();
   } finally { operation = null; }
 }
 async function stopServer(report = async () => {}) {
   if (operation) throw new Error(`SMC is already ${operation}.`);
   cooldown(); operation = "stopping";
+  const token = cancellationGeneration;
   try {
+    assertActive(token);
     if ((await github.state()) !== "Available") return { stopped: true };
     if (!agent.connected()) throw new Error("SMC agent is offline; I can’t verify whether players are online.");
     const current = agent.status();
@@ -57,15 +76,18 @@ async function stopServer(report = async () => {}) {
     if (online > 0) throw new Error(`The server has ${online} player${online === 1 ? "" : "s"} online. SMC will not stop it until everyone leaves.`);
     agent.setDesired("stopped");
     await report("No players are online. Shutting Minecraft down cleanly.");
-    await waitFor("Minecraft shutdown", async () => !agent.connected() || ["stopped", "offline"].includes(agent.status().minecraft), config.stopTimeoutMs, report, 1000);
+    await waitFor("Minecraft shutdown", async () => !agent.connected() || ["stopped", "offline"].includes(agent.status().minecraft), config.stopTimeoutMs, report, 1000, token);
     await report("Minecraft is empty and stopped. Stopping Codespace…");
+    assertActive(token);
     await github.stop();
-    await waitFor("Codespace shutdown", async () => ["Shutdown", "Archived"].includes(await github.state()), config.codespaceTimeoutMs, report, 2000);
+    await waitFor("Codespace shutdown", async () => ["Shutdown", "Archived"].includes(await github.state()), config.codespaceTimeoutMs, report, 2000, token);
     return { stopped: true };
   } finally { operation = null; }
 }
 async function recoverServer(report = async () => {}) {
   if (operation) return liveStatus();
+  if (forceStopped) return liveStatus();
+  const token = cancellationGeneration;
   if (agent.info().desiredMinecraft !== "running") return liveStatus();
 
   const state = await github.state();
@@ -73,9 +95,9 @@ async function recoverServer(report = async () => {}) {
     operation = "recovering";
     try {
       await report("Minecraft is still expected to be running. Recovering the Codespace…");
-      await ensureCodespace(report);
-      await ensureAgent(report);
-      await waitFor("Minecraft recovery", () => agent.status().minecraft === "running", config.startTimeoutMs, report, 2000);
+      await ensureCodespace(report, token);
+      await ensureAgent(report, token);
+      await waitFor("Minecraft recovery", () => agent.status().minecraft === "running", config.startTimeoutMs, report, 2000, token);
       return liveStatus();
     } finally {
       operation = null;
@@ -86,8 +108,8 @@ async function recoverServer(report = async () => {}) {
     operation = "recovering";
     try {
       await report("Codespace is online, but the SMC agent is offline. Waiting for recovery…");
-      await ensureAgent(report);
-      await waitFor("Minecraft recovery", () => agent.status().minecraft === "running", config.startTimeoutMs, report, 2000);
+      await ensureAgent(report, token);
+      await waitFor("Minecraft recovery", () => agent.status().minecraft === "running", config.startTimeoutMs, report, 2000, token);
       return liveStatus();
     } finally {
       operation = null;
@@ -98,18 +120,20 @@ async function recoverServer(report = async () => {}) {
   if (current.minecraft !== "running") {
     operation = "recovering";
     try {
+      assertActive(token);
       // A heartbeat/ready-state hiccup must never become an unsolicited
       // Minecraft restart. The agent now reports the actual process state.
       if (current.processAlive) {
         await report("Minecraft process is still alive. Waiting for it to become ready…");
-        await waitFor("Minecraft recovery", () => agent.status().minecraft === "running" || !agent.status().processAlive, Math.min(30000, config.startTimeoutMs), report, 2000);
+        await waitFor("Minecraft recovery", () => agent.status().minecraft === "running" || !agent.status().processAlive, Math.min(30000, config.startTimeoutMs), report, 2000, token);
       }
 
       const afterWait = agent.status();
       if (afterWait.minecraft !== "running") {
         await report("Minecraft process is not running. Starting it without a forced restart…");
+        assertActive(token);
         agent.setDesired("running");
-        await waitFor("Minecraft recovery", () => agent.status().minecraft === "running", config.startTimeoutMs, report, 2000);
+        await waitFor("Minecraft recovery", () => agent.status().minecraft === "running", config.startTimeoutMs, report, 2000, token);
       }
     } finally {
       operation = null;
@@ -120,7 +144,10 @@ async function recoverServer(report = async () => {}) {
 }
 async function restartServer(report = async () => {}) {
   if (operation) throw new Error(`SMC is already ${operation}.`); cooldown(); operation = "restarting";
+  forceStopped = false;
+  const token = cancellationGeneration;
   try {
+    assertActive(token);
     if ((await github.state()) === "Available" && agent.connected()) {
       const current = agent.status();
       if (current.minecraft === "running") {
@@ -130,13 +157,42 @@ async function restartServer(report = async () => {}) {
       }
     }
     agent.setDesired("running");
-    await ensureCodespace(report);
-    await ensureAgent(report);
+    await ensureCodespace(report, token);
+    await ensureAgent(report, token);
+    assertActive(token);
     agent.restart();
-    await waitFor("Minecraft restart", () => agent.status().minecraft === "running", config.startTimeoutMs + config.stopTimeoutMs, report, 2000);
+    await waitFor("Minecraft restart", () => agent.status().minecraft === "running", config.startTimeoutMs + config.stopTimeoutMs, report, 2000, token);
     return liveStatus();
   } finally { operation = null; }
 }
+async function forceStop() {
+  cancellationGeneration += 1;
+  forceStopped = true;
+  operation = "force-stopping";
+
+  try {
+    // Immediately tell the Codespace agent that Minecraft must remain stopped.
+    try { agent.setDesired("stopped"); } catch (error) {
+      console.error("[SMC] force-stop desired-state update failed:", error.message);
+    }
+
+    // Do not wait for the normal stop workflow. Stop the Codespace directly.
+    try {
+      if (await github.state() === "Available") await github.stop();
+    } catch (error) {
+      console.error("[SMC] force-stop Codespace shutdown failed:", error.message);
+      throw new Error(`Force-stop could not stop the Codespace: ${error.message}`);
+    }
+
+    return { forced: true, stopped: true };
+  } finally {
+    operation = null;
+  }
+}
+function automaticRecoveryEnabled() {
+  return !forceStopped && agent.info().desiredMinecraft === "running";
+}
+
 function formatOnline(s) {
   if (s.minecraft !== "running") return "⚫ **Minecraft is offline**\n\nThere are no players online right now.";
   const p = s.players;
@@ -214,6 +270,8 @@ function formatAddress(s) {
 module.exports = {
   liveStatus, startServer, stopServer, restartServer, recoverServer, formatOnline, formatWhitelist, formatHealth, formatLogs, formatCrash, formatAddress,
   operation: () => operation,
+  forceStop,
+  automaticRecoveryEnabled,
   kick: name => minecraftAction(agent.kick, [name]), ban: name => minecraftAction(agent.ban, [name]), pardon: name => minecraftAction(agent.pardon, [name]),
   op: name => minecraftAction(agent.op, [name]), deop: name => minecraftAction(agent.deop, [name]),
   whitelistAdd: name => minecraftAction(agent.whitelistAdd, [name]), whitelistRemove: name => minecraftAction(agent.whitelistRemove, [name]), whitelistClear: () => minecraftAction(agent.whitelistClear),
