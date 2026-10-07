@@ -206,14 +206,27 @@ async function handle(message, parts) {
   if (command === "whitelist" && !["add", "remove", "rm", "clear"].includes((parts[2] || "").toLowerCase())) return message.reply(controller.formatWhitelist(await controller.liveStatus()));
   if (command === "backup") {
     if (!canAdmin(message.member)) return message.reply("👑 **Admin access required for backup.**");
-    let working = await message.reply("🟡 **Backing up SMC**\nExporting Codespace changes and saving server files externally…");
+    let working = await message.reply("💾 **SMC backup**\nStarting a protected backup…");
     try {
-      const result = await controller.backupServer(text => working.edit("🟡 **Backing up SMC**\n" + text).catch(() => {}));
+      const report = async text => {
+        const progress = controller.backupStatus();
+        const stage = progress.stage === "world" ? "🌍 Server/world backup"
+          : progress.stage === "complete" ? "🟢 Finalizing"
+          : progress.stage === "failed" ? "🔴 Failed"
+          : "🔎 Checking";
+        await working.edit("💾 **SMC backup**\n\n" + stage + "\n" + text + "\n\n🛡️ Idle shutdown is blocked while the backup is running.").catch(() => {});
+      };
+      const result = await controller.backupServer(report);
       record(message, "backup", "completed");
-      return working.edit("🟢 **SMC backup complete**\n\nCodespace export: **" + (result.codespace?.state || "unknown") + "**\nServer/world backup: **" + (result.files?.skipped ? "skipped" : result.files?.error ? "failed" : "uploaded") + "**");
+      return working.edit(
+        "🟢 **SMC backup complete**\n\n" +
+        "Server/world backup: **" + (result.files?.skipped ? "skipped" : result.files?.error ? "failed" : "uploaded") + "**\n" +
+        "Codespace export: **protected/skipped while Minecraft was running**\n\n" +
+        "🛡️ Idle shutdown protection has been released."
+      );
     } catch (error) {
       record(message, "backup", "error");
-      return working.edit("🔴 **SMC backup failed**\n" + error.message).catch(() => {});
+      return working.edit("🔴 **SMC backup failed**\n\n" + error.message + "\n\n🛡️ Idle shutdown protection is released.").catch(() => {});
     }
   }
   if (command === "help") return message.reply([
@@ -225,8 +238,8 @@ async function handle(message, parts) {
     "`smc restart` — restart safely",
     "`smc force-stop` — immediately stop SMC and cancel the current action",
     "`smc backup` — create an external recovery backup",
-    "`smc playit` — connect/check the Playit tunnel",
-    "`smc playit restart` — restart Playit when the server is empty",
+    "`smc playit` — show the Playit connection and address",
+    "`smc playit connect` — connect/reconnect Playit\n    `smc playit restart` — restart Playit when the server is empty",
     "",
     "📊 **Information**",
     "`smc status` — server status",
@@ -296,8 +309,8 @@ ${text}`;
     }
     else if (command === "playit") {
       const sub = (parts[2] || "ensure").toLowerCase();
-      if (sub !== "restart" && sub !== "ensure" && sub !== "status") throw new Error("Usage: smc playit [restart]");
-      if (sub === "status") return message.reply(controller.formatAddress(await controller.liveStatus()));
+      if (sub !== "restart" && sub !== "ensure" && sub !== "status" && sub !== "connect") throw new Error("Usage: smc playit [status|connect|restart]");
+      if (sub === "status" || (parts.length === 2)) return message.reply(controller.formatAddress(await controller.liveStatus()));
       if (!canAdmin(message.member)) throw new Error("Admin access required for Playit control.");
       working = await message.reply(sub === "restart"
         ? "🟡 **Restarting Playit**\nReconnecting the public tunnel…"
@@ -446,7 +459,7 @@ setInterval(async () => {
     if (s.minecraft === "running" && s.players?.online === 0) {
       if (!emptySince) emptySince = Date.now();
       const idleMs = config.idleMinutes * 60 * 1000;
-      if (idleMs > 0 && Date.now() - emptySince >= idleMs && !controller.operation()) {
+      if (idleMs > 0 && Date.now() - emptySince >= idleMs && !controller.operation() && !controller.backupActive()) {
         await notify(`🛌 **IDLE SHUTDOWN**\nNo players have been online for **${config.idleMinutes} minutes**.\nSMC is shutting the world down safely.`);
         try { await controller.stopServer(); } catch (error) { await notify("⚠️ **IDLE SHUTDOWN BLOCKED**\n" + error.message); }
         emptySince = null;
