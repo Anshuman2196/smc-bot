@@ -217,7 +217,13 @@ function formatWhitelist(s) {
   ].join("\n");
 }
 
+let backupInFlight = null;
 async function backupServer(report = async () => {}) {
+  if (backupInFlight) {
+    await report("A backup is already in progress. Waiting for it to finish…");
+    return backupInFlight;
+  }
+  backupInFlight = (async () => {
   const results = { codespace: null, files: null };
   try {
     results.codespace = await github.exportCodespace();
@@ -242,6 +248,12 @@ async function backupServer(report = async () => {}) {
     throw new Error(`Both backup layers failed. Codespace: ${results.codespace.error || "unknown error"} Server/world: ${results.files.error || "unknown error"}`);
   }
   return results;
+  })();
+  try {
+    return await backupInFlight;
+  } finally {
+    backupInFlight = null;
+  }
 }
 async function requireLive() {
   const s = await liveStatus();
