@@ -366,15 +366,16 @@ let monitorSnapshot = null;
 let emptySince = null;
 let crashRecovery = { key: null, attempts: 0, lastAttemptAt: 0 };
 let lastBackupAt = 0;
-let backupInFlight = false;
 setInterval(async () => {
   try {
     const s = await controller.liveStatus();
     const compact = [s.codespace, s.minecraft, s.playit, s.publicAddress, s.players?.online ?? null].join("|");
-    if (!backupInFlight && Date.now() - lastBackupAt >= config.backupIntervalMs) {
-      backupInFlight = true;
+    if (s.minecraft === "running" &&
+        (s.players?.online ?? 0) > 0 &&
+        Date.now() - lastBackupAt >= config.backupIntervalMs) {
       lastBackupAt = Date.now();
-      controller.backupServer().catch(error => console.error("SMC automatic backup failed:", error.message)).finally(() => { backupInFlight = false; });
+      controller.backupServer()
+        .catch(error => console.error("SMC automatic backup failed:", error.message));
     }
 
     if (!controller.operation() && controller.automaticRecoveryEnabled() &&
