@@ -62,6 +62,50 @@ async function ensurePlayit(report = async () => {}, token = cancellationGenerat
   return agent.status();
 }
 
+async function restartAgent(report = async () => {}) {
+  if (operation) throw new Error(`SMC is already ${operation}.`);
+  cooldown();
+  operation = "agent-restarting";
+  try {
+    if ((await github.state()) !== "Available") {
+      throw new Error("Codespace is not online.");
+    }
+    if (!agent.connected()) {
+      throw new Error("SMC agent is already offline. Use \`smc start\` to recover the Codespace/agent.");
+    }
+
+    await report("Restarting the SMC agent…");
+    agent.agentRestart();
+
+    await waitFor(
+      "SMC agent shutdown",
+      () => !agent.connected(),
+      30000,
+      async () => {
+        await report("Stopping the old SMC agent process…");
+      },
+      1000
+    );
+
+    await waitFor(
+      "SMC agent",
+      () => agent.connected(),
+      config.startTimeoutMs,
+      async () => {
+        const i = agent.info();
+        await report(i.ageMs == null
+          ? "Waiting for the restarted SMC agent to connect…"
+          : `Agent heartbeat ${Math.ceil(i.ageMs / 1000)}s ago…`);
+      },
+      1500
+    );
+
+    return liveStatus();
+  } finally {
+    operation = null;
+  }
+}
+
 async function playitEnsure(report = async () => {}) {
   if (operation) throw new Error(`SMC is already ${operation}.`);
   cooldown();
@@ -457,7 +501,7 @@ function formatAddress(s) {
     : "🌐 **Playit address unavailable**\nStart Minecraft and wait for the tunnel to connect.";
 }
 module.exports = {
-  liveStatus, startServer, stopServer, closeServices, restartServer, recoverServer, backupServer, backupStatus, backupActive, backupCancel, playitEnsure, playitRestart, formatOnline, formatWhitelist, formatHealth, formatLogs, formatCrash, formatAddress,
+  liveStatus, startServer, stopServer, closeServices, restartServer, restartAgent, recoverServer, backupServer, backupStatus, backupActive, backupCancel, playitEnsure, playitRestart, formatOnline, formatWhitelist, formatHealth, formatLogs, formatCrash, formatAddress,
   operation: () => operation,
   forceStop,
   automaticRecoveryEnabled,
