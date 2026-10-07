@@ -74,8 +74,9 @@ async function stopServer(report = async () => {}) {
     const online = current.players?.online;
     if (online == null) throw new Error("I can’t verify the player count yet. Try again in a few seconds.");
     if (online > 0) throw new Error(`The server has ${online} player${online === 1 ? "" : "s"} online. SMC will not stop it until everyone leaves.`);
+    await backupServer(report);
     agent.setDesired("stopped");
-    await report("No players are online. Shutting Minecraft down cleanly.");
+    await report("Backup complete. No players are online. Shutting Minecraft down cleanly.");
     await waitFor("Minecraft shutdown", async () => !agent.connected() || ["stopped", "offline"].includes(agent.status().minecraft), config.stopTimeoutMs, report, 1000, token);
     await report("Minecraft is empty and stopped. Stopping Codespace…");
     assertActive(token);
@@ -216,6 +217,30 @@ function formatWhitelist(s) {
   ].join("\n");
 }
 
+async function backupServer(report = async () => {}) {
+  const results = { codespace: null, files: null };
+  try {
+    results.codespace = await github.exportCodespace();
+    await report("Codespace changes exported to a recovery branch.");
+  } catch (error) {
+    results.codespace = { state: "failed", error: error.message };
+    await report("Codespace export failed: " + error.message);
+  }
+  try {
+    if (agent.connected() && agent.status().minecraft === "running") {
+      const item = agent.backup();
+      results.files = await agent.waitForAction(item.id, Math.max(config.backupTimeoutMs, config.commandTimeoutMs));
+      await report("Server/world backup uploaded to GitHub Releases.");
+    } else {
+      results.files = { skipped: true, reason: "Minecraft is not running." };
+    }
+  } catch (error) {
+    results.files = { error: error.message };
+    await report("Server/world backup failed: " + error.message);
+  }
+  if (results.codespace?.state === "failed" && results.files?.error) throw new Error("Both backup layers failed.");
+  return results;
+}
 async function requireLive() {
   const s = await liveStatus();
   if (s.agent !== "online") throw new Error("SMC agent is offline.");
