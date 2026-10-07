@@ -238,7 +238,9 @@ async function backupServer(report = async () => {}) {
     results.files = { error: error.message };
     await report("Server/world backup failed: " + error.message);
   }
-  if (results.codespace?.state === "failed" && results.files?.error) {\n    throw new Error(`Both backup layers failed. Codespace: ${results.codespace.error || "unknown error"} Server/world: ${results.files.error || "unknown error"}`);\n  }
+  if (results.codespace?.state === "failed" && results.files?.error) {
+    throw new Error(`Both backup layers failed. Codespace: ${results.codespace.error || "unknown error"} Server/world: ${results.files.error || "unknown error"}`);
+  }
   return results;
 }
 async function requireLive() {
