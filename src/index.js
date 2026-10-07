@@ -393,8 +393,21 @@ const json = (res, status, data) => {
 };
 
 const server = http.createServer((req, res) => {
-  if (req.method === "GET" && (req.url === "/" || req.url === "/health"))
-    return json(res, 200, { ok: true, operation: controller.operation(), agent: agent.info() });
+  if (req.method === "GET" && req.url === "/health") {
+    return json(res, 200, {
+      ok: true,
+      status: "healthy",
+      discord: client.isReady() ? "ready" : "connecting",
+      operation: controller.operation() || null
+    });
+  }
+
+  if (req.method === "GET" && req.url === "/")
+    return json(res, 200, {
+      ok: true,
+      service: "smc-bot",
+      health: "/health"
+    });
 
   if (req.method !== "POST" || req.url !== "/agent/sync")
     return json(res, 404, { error: "not_found" });
