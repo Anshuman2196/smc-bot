@@ -300,6 +300,26 @@ async function backupServer(report = async () => {}) {
   backupInFlight = (async () => {
   backupProgress = { active: true, stage: "checking", message: "Checking server and agent state…", startedAt: Date.now(), updatedAt: Date.now() };
   const progress = async (stage, message) => { backupProgress = { ...backupProgress, active: true, stage, message, updatedAt: Date.now() }; await report(message); };
+  let heartbeatTimer = null;
+  const startHeartbeat = () => {
+    heartbeatTimer = setInterval(() => {
+      if (!backupProgress.active) return;
+      const elapsed = Math.max(0, Date.now() - (backupProgress.startedAt || Date.now()));
+      const seconds = Math.floor(elapsed / 1000);
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      const stage = backupProgress.stage === "world" ? "🌍 Server/world backup"
+        : backupProgress.stage === "complete" ? "🟢 Finalizing"
+        : backupProgress.stage === "failed" ? "🔴 Failed"
+        : "🔎 Checking";
+      report(`${stage} is still running… ⏳\nElapsed: **${mins}m ${String(secs).padStart(2, "0")}s**`).catch(() => {});
+    }, 15000);
+  };
+  const stopHeartbeat = () => {
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  };
+  startHeartbeat();
   const results = { codespace: null, files: null };
   const current = await liveStatus();
   if (current.agent !== "online") throw new Error("SMC agent is offline.");
@@ -344,6 +364,7 @@ async function backupServer(report = async () => {}) {
   try {
     return await backupInFlight;
   } finally {
+    stopHeartbeat();
     backupInFlight = null;
     if (ownOperation) operation = null;
     backupProgress = { ...backupProgress, active: false, updatedAt: Date.now() };
