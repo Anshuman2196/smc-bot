@@ -317,9 +317,16 @@ async function backupServer(report = async () => {}) {
     }
   } catch (error) {
     results.files = { error: error.message };
-    await report("Server/world backup failed: " + error.message);
+    if (/cancelled by request/i.test(error.message || "")) {
+      await progress("failed", "Backup cancellation confirmed. Stopping the backup…");
+    } else {
+      await report("Server/world backup failed: " + error.message);
+    }
   }
   if (results.files?.error) {
+    if (/cancelled by request/i.test(results.files.error || "")) {
+      throw new Error("Backup stopped by request.");
+    }
     throw new Error(`Server/world backup failed: ${results.files.error || "unknown error"}`);
   }
   await progress("complete", "Backup finished successfully.");
