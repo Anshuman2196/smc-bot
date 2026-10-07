@@ -244,39 +244,67 @@ async function handle(message, parts) {
       return working.edit("🔴 **SMC backup failed**\n\n" + error.message + "\n\n🛡️ Idle shutdown protection was not engaged because the backup did not start.").catch(() => {});
     }
   }
+  if (command === "agent" || command === "restart-agent" || command === "agent-restart") {
+    const sub = (parts[2] || "status").toLowerCase();
+    if (sub !== "restart" && sub !== "status") return message.reply("Usage: `smc agent [status|restart]`");
+    if (sub === "status") return message.reply(format(await controller.liveStatus()));
+    if (!canAdmin(message.member)) return message.reply("👑 **Admin access required to restart the SMC agent.**");
+
+    let working = await message.reply("🟡 **Restarting SMC agent**\\nRefreshing the Codespace control process…");
+    try {
+      const result = await controller.restartAgent(text => progress(working, text));
+      record(message, "agent restart", "completed");
+      return working.edit("🟢 **SMC agent restarted**\\n\\nThe agent reconnected successfully. Minecraft was not restarted.").catch(() => {});
+    } catch (error) {
+      record(message, "agent restart", "error");
+      return working.edit("🔴 **SMC agent restart failed**\\n\\n" + error.message).catch(() => {});
+    }
+  }
+
   if (command === "help") return message.reply([
     "**Smarties • Commands**",
     "",
-    "🟢 **Server**",
+    "🎮 **Server Control**",
     "`smc start` — start Minecraft",
-    "`smc stop` — stop when empty",
-    "`smc restart` — restart safely",
+    "`smc stop` — safely stop Minecraft, backup, then stop the Codespace",
+    "`smc restart` — safely restart Minecraft",
+    "`smc close` — stop Minecraft + Playit without stopping the Codespace",
     "`smc force-stop` — immediately stop SMC and cancel the current action",
-    "`smc backup` — create a recovery backup (Minecraft must be stopped)",\n    "`smc close` — stop Minecraft + Playit without stopping the Codespace",
+    "",
+    "🛡️ **Recovery & Maintenance**",
+    "`smc backup` — create a recovery backup (Minecraft must be stopped)",
     "`smc backup stop` — cancel the active backup safely",
+    "`smc save` — save the Minecraft world",
+    "",
+    "🌐 **Connectivity**",
     "`smc playit` — show the Playit connection and address",
-    "`smc playit connect` — connect/reconnect Playit\n    `smc playit restart` — restart Playit when the server is empty",
+    "`smc playit connect` — connect/reconnect Playit",
+    "`smc playit restart` — restart Playit when the server is empty",
+    "",
+    "🤖 **SMC Control Plane**",
+    "`smc agent status` — show SMC agent status",
+    "`smc agent restart` — restart the SMC agent without restarting Minecraft",
     "",
     "📊 **Information**",
     "`smc status` — server status",
     "`smc online` — players online",
     "`smc health` — health check",
     "`smc address` — Playit address",
-    "`smc logs` — recent log",
+    "`smc properties` — server.properties summary",
+    "`smc logs` — recent Minecraft log",
     "`smc crash` — crash details",
     "",
     "👥 **Players**",
-  "`smc say <message>`",
-  "`smc kick <player>`",
-  "`smc ban <player>` / `smc pardon <player>`",
-  "`smc op <player>` / `smc deop <player>`",
-    "`smc whitelist`",
-    "`smc save`",
+    "`smc say <message>` — send a message in Minecraft",
+    "`smc kick <player>` — kick a player",
+    "`smc ban <player>` / `smc pardon <player>` — manage bans",
+    "`smc op <player>` / `smc deop <player>` — manage operator access",
+    "`smc whitelist` — view whitelist",
     "",
-    "⚙️ **Minecraft commands**",
+    "⚙️ **Minecraft / Admin**",
     "`smc command <minecraft command>` — run any Minecraft command (admin)",
-    "",
-    "⚙️ `smc admin` — admin controls"
+    "`smc set <property> <value>` — change an allowed server property (admin)",
+    "`smc admin` — admin controls"
   ].join("\n"));
   if (command === "force-stop" || command === "forcestop") {
     if (!canAdmin(message.member)) return message.reply("👑 **Admin access required for force-stop.**");
