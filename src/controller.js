@@ -227,7 +227,7 @@ async function backupServer(report = async () => {}) {
     await report("Codespace export failed: " + error.message);
   }
   try {
-    if (agent.connected() && agent.status().minecraft === "running") {
+    if (agent.connected()) {
       const item = agent.backup();
       results.files = await agent.waitForAction(item.id, Math.max(config.backupTimeoutMs, config.commandTimeoutMs));
       await report("Server/world backup uploaded to GitHub Releases.");
