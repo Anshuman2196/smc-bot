@@ -241,7 +241,7 @@ async function handle(message, parts) {
       if (/Backup stopped by request/i.test(error.message || "")) {
         return working.edit("⚫ **SMC backup stopped**\n\nThe backup was cancelled by an admin.\n\n🛡️ Idle shutdown protection has been released.").catch(() => {});
       }
-      return working.edit("🔴 **SMC backup failed**\n\n" + error.message + "\n\n🛡️ Idle shutdown protection is released.").catch(() => {});
+      return working.edit("🔴 **SMC backup failed**\n\n" + error.message + "\n\n🛡️ Idle shutdown protection was not engaged because the backup did not start.").catch(() => {});
     }
   }
   if (command === "help") return message.reply([
