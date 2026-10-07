@@ -204,6 +204,18 @@ async function handle(message, parts) {
   if (command === "address") return message.reply(controller.formatAddress(await controller.liveStatus()));
   if (command === "online") return message.reply(controller.formatOnline(await controller.liveStatus()));
   if (command === "whitelist" && !["add", "remove", "rm", "clear"].includes((parts[2] || "").toLowerCase())) return message.reply(controller.formatWhitelist(await controller.liveStatus()));
+  if (command === "backup") {
+    if (!canAdmin(message.member)) return message.reply("👑 **Admin access required for backup.**");
+    let working = await message.reply("🟡 **Backing up SMC**\nExporting Codespace changes and saving server files externally…");
+    try {
+      const result = await controller.backupServer(text => working.edit("🟡 **Backing up SMC**\n" + text).catch(() => {}));
+      record(message, "backup", "completed");
+      return working.edit("🟢 **SMC backup complete**\n\nCodespace export: **" + (result.codespace?.state || "unknown") + "**\nServer/world backup: **" + (result.files?.skipped ? "skipped" : result.files?.error ? "failed" : "uploaded") + "**");
+    } catch (error) {
+      record(message, "backup", "error");
+      return working.edit("🔴 **SMC backup failed**\n" + error.message).catch(() => {});
+    }
+  }
   if (command === "help") return message.reply([
     "**Smarties • Commands**",
     "",
@@ -212,6 +224,7 @@ async function handle(message, parts) {
     "`smc stop` — stop when empty",
     "`smc restart` — restart safely",
     "`smc force-stop` — immediately stop SMC and cancel the current action",
+    "`smc backup` — create an external recovery backup",
     "",
     "📊 **Information**",
     "`smc status` — server status",
@@ -352,10 +365,17 @@ async function notify(text) {
 let monitorSnapshot = null;
 let emptySince = null;
 let crashRecovery = { key: null, attempts: 0, lastAttemptAt: 0 };
+let lastBackupAt = 0;
+let backupInFlight = false;
 setInterval(async () => {
   try {
     const s = await controller.liveStatus();
     const compact = [s.codespace, s.minecraft, s.playit, s.publicAddress, s.players?.online ?? null].join("|");
+    if (!backupInFlight && Date.now() - lastBackupAt >= config.backupIntervalMs) {
+      backupInFlight = true;
+      lastBackupAt = Date.now();
+      controller.backupServer().catch(error => console.error("SMC automatic backup failed:", error.message)).finally(() => { backupInFlight = false; });
+    }
 
     if (!controller.operation() && controller.automaticRecoveryEnabled() &&
         (s.codespace !== "online" || s.agent !== "online" || s.minecraft !== "running")) {
