@@ -27,8 +27,19 @@ function action(type, args = {}) {
 }
 async function waitForAction(id, timeoutMs = 15000) {
   const end = Date.now() + timeoutMs;
+  let disconnectedAt = 0;
   while (Date.now() < end) {
-    if (!connected()) throw new Error("SMC agent went offline while completing the action.");
+    if (!connected()) {
+      if (!disconnectedAt) disconnectedAt = Date.now();
+      // A busy Codespace/agent can briefly miss a heartbeat. Give it a
+      // reconnect grace period instead of declaring the action failed
+      // immediately.
+      if (Date.now() - disconnectedAt >= Math.min(30000, Math.max(10000, config.agentStaleMs * 2))) {
+        throw new Error("SMC agent went offline while completing the action.");
+      }
+    } else {
+      disconnectedAt = 0;
+    }
     const result = state.actionResults?.[id] || state.lastActionResult;
     if (result && result.id === id) {
       if (!result.ok) throw new Error(result.error || "Minecraft action failed.");
