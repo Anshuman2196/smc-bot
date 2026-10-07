@@ -26,12 +26,12 @@ async function ensureAgent(report) {
   }, 1500);
 }
 async function liveStatus() {
-  const result = { codespace: "offline", agent: "offline", minecraft: "offline", playit: "offline", publicAddress: null, players: null, maxPlayers: null, uptimeSec: null, crashed: false, lastActionResult: null, lastStopReason: "none", crashStreak: 0, lastCrashAt: null, lastExit: null, whitelist: [], error: null };
+  const result = { codespace: "offline", agent: "offline", minecraft: "offline", processAlive: false, playit: "offline", publicAddress: null, players: null, maxPlayers: null, uptimeSec: null, crashed: false, lastActionResult: null, lastStopReason: "none", crashStreak: 0, lastCrashAt: null, lastExit: null, whitelist: [], error: null };
   try { const s = await github.state(); result.codespace = s === "Available" ? "online" : s === "ShuttingDown" ? "stopping" : "offline"; } catch (e) { result.error = e.message; return result; }
   if (result.codespace !== "online") return result;
   if (!agent.connected()) return result;
   result.agent = "online";
-  try { const s = agent.status(); Object.assign(result, { minecraft: s.minecraft || "unknown", playit: s.playit || "unknown", publicAddress: s.publicAddress || null, minecraftPort: Boolean(s.minecraftPort), crashed: Boolean(s.crashed), lastStopReason: s.lastStopReason || "none", crashStreak: s.crashStreak || 0, lastCrashAt: s.lastCrashAt || null, lastExit: s.lastExit ?? null, lastActionResult: s.lastActionResult || null, logTail: Array.isArray(s.logTail) ? s.logTail : [], players: s.players || null, maxPlayers: s.players?.max ?? s.maxPlayers ?? null, uptimeSec: s.uptimeSec ?? null, whitelist: Array.isArray(s.whitelist) ? s.whitelist : [], serverProperties: s.serverProperties || {} }); } catch (e) { result.error = e.message; }
+  try { const s = agent.status(); Object.assign(result, { minecraft: s.minecraft || "unknown", processAlive: Boolean(s.processAlive), playit: s.playit || "unknown", publicAddress: s.publicAddress || null, minecraftPort: Boolean(s.minecraftPort), crashed: Boolean(s.crashed), lastStopReason: s.lastStopReason || "none", crashStreak: s.crashStreak || 0, lastCrashAt: s.lastCrashAt || null, lastExit: s.lastExit ?? null, lastActionResult: s.lastActionResult || null, logTail: Array.isArray(s.logTail) ? s.logTail : [], players: s.players || null, maxPlayers: s.players?.max ?? s.maxPlayers ?? null, uptimeSec: s.uptimeSec ?? null, whitelist: Array.isArray(s.whitelist) ? s.whitelist : [], serverProperties: s.serverProperties || {} }); } catch (e) { result.error = e.message; }
   return result;
 }
 async function startServer(report = async () => {}) {
@@ -98,9 +98,19 @@ async function recoverServer(report = async () => {}) {
   if (current.minecraft !== "running") {
     operation = "recovering";
     try {
-      await report("Minecraft is offline while SMC still expects it to be running. Restarting…");
-      agent.restart();
-      await waitFor("Minecraft recovery", () => agent.status().minecraft === "running", config.startTimeoutMs + config.stopTimeoutMs, report, 2000);
+      // A heartbeat/ready-state hiccup must never become an unsolicited
+      // Minecraft restart. The agent now reports the actual process state.
+      if (current.processAlive) {
+        await report("Minecraft process is still alive. Waiting for it to become ready…");
+        await waitFor("Minecraft recovery", () => agent.status().minecraft === "running" || !agent.status().processAlive, Math.min(30000, config.startTimeoutMs), report, 2000);
+      }
+
+      const afterWait = agent.status();
+      if (afterWait.minecraft !== "running") {
+        await report("Minecraft process is not running. Starting it without a forced restart…");
+        agent.setDesired("running");
+        await waitFor("Minecraft recovery", () => agent.status().minecraft === "running", config.startTimeoutMs, report, 2000);
+      }
     } finally {
       operation = null;
     }
