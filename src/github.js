@@ -2,7 +2,16 @@ const config = require("./config");
 const API = "https://api.github.com";
 async function request(method, path) {
   const response = await fetch(API + path, { method, headers: { Authorization: `Bearer ${config.ghToken}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "smc-control-plane" }, signal: AbortSignal.timeout(20000) });
-  if (!response.ok) {\n    let detail = "";\n    try { detail = await response.text(); } catch {}\n    let message = `GitHub ${method} ${path} -> ${response.status}`;\n    try { const parsed = JSON.parse(detail); if (parsed.message) message += `: ${parsed.message}`; } catch {}\n    throw new Error(message);\n  }
+  if (!response.ok) {
+    let detail = "";
+    try { detail = await response.text(); } catch {}
+    let message = `GitHub ${method} ${path} -> ${response.status}`;
+    try {
+      const parsed = JSON.parse(detail);
+      if (parsed.message) message += `: ${parsed.message}`;
+    } catch {}
+    throw new Error(message);
+  }
   return response.status === 204 ? null : response.json();
 }
 const resource = () => `/user/codespaces/${encodeURIComponent(config.codespaceName)}`;
