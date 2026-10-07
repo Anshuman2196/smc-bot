@@ -1,13 +1,13 @@
 services:
   - type: web
-    name: smc-bot
+    name: smc-bot-1
     runtime: node
     plan: free
-    region: singapore
+    region: frankfurt
     branch: main
     rootDir: .
     buildCommand: npm install
-    startCommand: npm start
+    startCommand: node src/index.js
     healthCheckPath: /health
     autoDeploy: true
     envVars:
