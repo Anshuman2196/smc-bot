@@ -80,7 +80,7 @@ async function restartAgent(report = async () => {}) {
     await waitFor(
       "SMC agent shutdown",
       () => !agent.connected(),
-      30000,
+      Math.max(90000, config.agentStaleMs * 5),
       async () => {
         await report("Stopping the old SMC agent process…");
       },
