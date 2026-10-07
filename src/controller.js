@@ -283,7 +283,16 @@ async function backupServer(report = async () => {}) {
     return backupInFlight;
   }
   if (operation && operation !== "stopping") {
-    throw new Error(`SMC is already ${operation}. Wait for the current action to finish before backing up.`);
+    // A start action can reach fully-running Minecraft before its final
+    // Playit/health checks finish. In that state a backup is safe to begin;
+    // the start operation still owns the controller until it finishes.
+    if (operation !== "starting") {
+      throw new Error(`SMC is already ${operation}. Wait for the current action to finish before backing up.`);
+    }
+    const startingStatus = await liveStatus();
+    if (startingStatus.minecraft !== "running" || !startingStatus.processAlive) {
+      throw new Error(`SMC is already ${operation}. Wait for the current action to finish before backing up.`);
+    }
   }
   const ownOperation = !operation;
   if (ownOperation) operation = "backing-up";
