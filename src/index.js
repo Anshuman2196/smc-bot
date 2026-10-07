@@ -394,6 +394,19 @@ setInterval(async () => {
     }
 
     if (!controller.operation() && controller.automaticRecoveryEnabled() &&
+        s.minecraft === "running" && s.playit !== "online") {
+      try {
+        await controller.playitEnsure();
+        const healed = await controller.liveStatus();
+        if (healed.playit === "online" && healed.publicAddress && s.playit !== "online") {
+          await notify("🟢 **PLAYIT RECOVERED**\n\nThe public Minecraft tunnel is connected again.\n\n`" + healed.publicAddress + "`");
+        }
+      } catch (error) {
+        console.error("SMC automatic Playit recovery failed:", error.message);
+      }
+    }
+
+    if (!controller.operation() && controller.automaticRecoveryEnabled() &&
         (s.codespace !== "online" || s.agent !== "online" || s.minecraft !== "running")) {
       try {
         const recovered = await controller.recoverServer();
