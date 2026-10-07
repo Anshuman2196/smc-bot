@@ -204,6 +204,18 @@ async function handle(message, parts) {
   if (command === "address") return message.reply(controller.formatAddress(await controller.liveStatus()));
   if (command === "online") return message.reply(controller.formatOnline(await controller.liveStatus()));
   if (command === "whitelist" && !["add", "remove", "rm", "clear"].includes((parts[2] || "").toLowerCase())) return message.reply(controller.formatWhitelist(await controller.liveStatus()));
+  if (command === "backup" && ["stop", "cancel"].includes((parts[2] || "").toLowerCase())) {
+    if (!canAdmin(message.member)) return message.reply("👑 **Admin access required to stop a backup.**");
+    let working = await message.reply("🟡 **Stopping SMC backup**\nRequesting cancellation from the SMC agent…");
+    try {
+      await controller.backupCancel(text => progress(working, text));
+      record(message, "backup stop", "completed");
+      return working.edit("⚫ **SMC backup stopped**\n\nThe active backup was cancelled at the agent layer.\n\n🛡️ Idle shutdown protection has been released.").catch(() => {});
+    } catch (error) {
+      record(message, "backup stop", "error");
+      return working.edit("🔴 **Backup stop failed**\n\n" + error.message).catch(() => {});
+    }
+  }
   if (command === "backup") {
     if (!canAdmin(message.member)) return message.reply("👑 **Admin access required for backup.**");
     let working = await message.reply("💾 **SMC backup**\nStarting a protected backup…");
@@ -225,7 +237,10 @@ async function handle(message, parts) {
         "🛡️ Idle shutdown protection has been released."
       );
     } catch (error) {
-      record(message, "backup", "error");
+      record(message, "backup", /Backup stopped by request/i.test(error.message || "") ? "stopped" : "error");
+      if (/Backup stopped by request/i.test(error.message || "")) {
+        return working.edit("⚫ **SMC backup stopped**\n\nThe backup was cancelled by an admin.\n\n🛡️ Idle shutdown protection has been released.").catch(() => {});
+      }
       return working.edit("🔴 **SMC backup failed**\n\n" + error.message + "\n\n🛡️ Idle shutdown protection is released.").catch(() => {});
     }
   }
@@ -238,6 +253,7 @@ async function handle(message, parts) {
     "`smc restart` — restart safely",
     "`smc force-stop` — immediately stop SMC and cancel the current action",
     "`smc backup` — create an external recovery backup",
+    "`smc backup stop` — cancel the active backup safely",
     "`smc playit` — show the Playit connection and address",
     "`smc playit connect` — connect/reconnect Playit\n    `smc playit restart` — restart Playit when the server is empty",
     "",
