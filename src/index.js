@@ -451,10 +451,20 @@ async function discordPreflight() {
     const body = await response.text();
     if (!response.ok) {
       let detail = body;
+      let retryAfter = response.headers.get("retry-after");
       try {
         const parsed = JSON.parse(body);
         detail = parsed.message || body;
+        retryAfter = parsed.retry_after ?? retryAfter;
       } catch {}
+
+      if (response.status === 429) {
+        console.warn(
+          `[Discord] Preflight ${name} is rate-limited (HTTP 429). Retry-After: ${retryAfter ?? "unknown"}s. Continuing to Gateway login instead of crash-looping.`
+        );
+        return false;
+      }
+
       throw new Error(`Discord preflight ${name} returned HTTP ${response.status}: ${detail}`);
     }
 
@@ -488,23 +498,45 @@ async function connectDiscord() {
   }
 
   const timeoutMs = 30000;
-  let timeout;
-  try {
-    await Promise.race([
-      client.login(config.discordToken),
-      new Promise((_, reject) => {
-        timeout = setTimeout(
-          () => reject(new Error(`Discord Gateway login timed out after ${timeoutMs}ms; inspect [Discord] debug/disconnect logs above.`)),
-          timeoutMs
-        );
-      })
-    ]);
-    console.log("[Discord] login() completed; waiting for READY...");
-  } catch (error) {
-    console.error("[Discord] login failed:", error?.stack || error);
-    process.exit(1);
-  } finally {
-    clearTimeout(timeout);
+  let attempt = 0;
+
+  while (true) {
+    attempt += 1;
+    let timeout;
+
+    try {
+      console.log(`[Discord] Gateway connection attempt ${attempt}...`);
+
+      await Promise.race([
+        client.login(config.discordToken),
+        new Promise((_, reject) => {
+          timeout = setTimeout(
+            () => reject(new Error(`Discord Gateway login timed out after ${timeoutMs}ms.`)),
+            timeoutMs
+          );
+        })
+      ]);
+
+      console.log("[Discord] login() completed; waiting for READY...");
+      return;
+    } catch (error) {
+      console.error("[Discord] login failed:", error?.stack || error);
+
+      const code = error?.code;
+      if (code === 4004 || code === 4013 || code === 4014) {
+        console.error(`[Discord] Fatal Gateway authentication/intent error ${code}; not retrying.`);
+        process.exit(1);
+      }
+
+      console.warn("[Discord] Treating this as a transient Gateway/network failure.");
+      try { client.destroy(); } catch {}
+
+      const delayMs = Math.min(120000, 30000 * Math.pow(2, Math.min(attempt - 1, 2)));
+      console.log(`[Discord] Retrying Gateway connection in ${Math.round(delayMs / 1000)}s...`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 }
 
