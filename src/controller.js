@@ -297,11 +297,9 @@ async function backupServer(report = async () => {}) {
   const ownOperation = !operation;
   if (ownOperation) operation = "backing-up";
 
-  backupInFlight = (async () => {
-  backupProgress = { active: true, stage: "checking", message: "Checking server and agent state…", startedAt: Date.now(), updatedAt: Date.now() };
-  const progress = async (stage, message) => { backupProgress = { ...backupProgress, active: true, stage, message, updatedAt: Date.now() }; await report(message); };
   let heartbeatTimer = null;
   const startHeartbeat = () => {
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
     heartbeatTimer = setInterval(() => {
       if (!backupProgress.active) return;
       const elapsed = Math.max(0, Date.now() - (backupProgress.startedAt || Date.now()));
@@ -312,13 +310,17 @@ async function backupServer(report = async () => {}) {
         : backupProgress.stage === "complete" ? "🟢 Finalizing"
         : backupProgress.stage === "failed" ? "🔴 Failed"
         : "🔎 Checking";
-      report(`${stage} is still running… ⏳\nElapsed: **${mins}m ${String(secs).padStart(2, "0")}s**`).catch(() => {});
+      report(stage + " is still running… ⏳\nElapsed: **" + mins + "m " + String(secs).padStart(2, "0") + "s**").catch(() => {});
     }, 15000);
   };
   const stopHeartbeat = () => {
     if (heartbeatTimer) clearInterval(heartbeatTimer);
     heartbeatTimer = null;
   };
+
+  backupInFlight = (async () => {
+  backupProgress = { active: true, stage: "checking", message: "Checking server and agent state…", startedAt: Date.now(), updatedAt: Date.now() };
+  const progress = async (stage, message) => { backupProgress = { ...backupProgress, active: true, stage, message, updatedAt: Date.now() }; await report(message); };
   startHeartbeat();
   const results = { codespace: null, files: null };
   const current = await liveStatus();
