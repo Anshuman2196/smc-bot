@@ -293,13 +293,15 @@ async function backupServer(report = async () => {}) {
     throw new Error(`Minecraft is ${current.minecraft}. Backups are only allowed after Minecraft is fully RUNNING.`);
   }
   await report("Minecraft is fully RUNNING. Starting a consistent backup…");
-  try {
-    results.codespace = await github.exportCodespace();
-    await report("Codespace changes exported to a recovery branch.");
-  } catch (error) {
-    results.codespace = { state: "failed", error: error.message };
-    await report("Codespace export failed: " + error.message);
-  }
+  // Never invoke the GitHub Codespaces export API while Minecraft is live.
+  // The external archive below already captures the repository/server state
+  // needed for SMC recovery without touching Codespace lifecycle state.
+  results.codespace = {
+    state: "skipped",
+    reason: "live_codespace_protected",
+    message: "Codespace export skipped while Minecraft is running to prevent lifecycle interruption."
+  };
+  await report("Live Codespace protected. Creating the external server/world backup…");
   try {
     if (agent.connected()) {
       const item = agent.backup();
@@ -312,8 +314,8 @@ async function backupServer(report = async () => {}) {
     results.files = { error: error.message };
     await report("Server/world backup failed: " + error.message);
   }
-  if (results.codespace?.state === "failed" && results.files?.error) {
-    throw new Error(`Both backup layers failed. Codespace: ${results.codespace.error || "unknown error"} Server/world: ${results.files.error || "unknown error"}`);
+  if (results.files?.error) {
+    throw new Error(`Server/world backup failed: ${results.files.error || "unknown error"}`);
   }
   return results;
   })();
