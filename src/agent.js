@@ -21,7 +21,7 @@ function info() { return { connected: connected(), ageMs: seenAt ? Date.now() - 
 function status() { if (!connected()) throw new Error("SMC agent is offline"); return state; }
 function action(type, args = {}) {
   if (!connected()) throw new Error("SMC agent is offline");
-  const independent = new Set(["backup", "backup.cancel", "playit.ensure", "playit.restart"]);
+  const independent = new Set(["backup", "backup.cancel", "playit.ensure", "playit.restart", "playit.stop"]);
   if (!independent.has(type) && state.minecraft !== "running") throw new Error("Minecraft is not running");
   return enqueue(type, args);
 }
@@ -63,5 +63,6 @@ function save() { return action("save"); }
 function backup() { return action("backup"); }
 function playitEnsure() { return action("playit.ensure"); }
 function playitRestart() { return action("playit.restart"); }
+function playitStop() { return action("playit.stop"); }
 function propertySet(key, value) { return action("property.set", { key, value }); }
-module.exports = { authenticated, connected, sync, info, status, setDesired, restart, action, waitForAction, whitelistAdd, whitelistRemove, whitelistClear, kick, ban, pardon, op, deop, say, command, save, backup, playitEnsure, playitRestart, propertySet };
+module.exports = { authenticated, connected, sync, info, status, setDesired, restart, action, waitForAction, whitelistAdd, whitelistRemove, whitelistClear, kick, ban, pardon, op, deop, say, command, save, backup, playitEnsure, playitRestart, playitStop, propertySet };
