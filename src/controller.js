@@ -118,6 +118,44 @@ async function startServer(report = async () => {}) {
     return liveStatus();
   } finally { operation = null; }
 }
+async function shutdownServices(report = async () => {}, token = cancellationGeneration) {
+  assertActive(token);
+  if ((await github.state()) !== "Available") return { minecraft: "offline", playit: "offline" };
+  if (!agent.connected()) throw new Error("SMC agent is offline; I can’t safely close Minecraft and Playit.");
+
+  const current = agent.status();
+  const online = current.players?.online;
+  if (current.minecraft === "running") {
+    if (online == null) throw new Error("I can’t verify the player count yet. Try again in a few seconds.");
+    if (online > 0) throw new Error(`The server has ${online} player${online === 1 ? "" : "s"} online. SMC will not close Minecraft while players are connected.`);
+    await report("No players are online. Closing Minecraft cleanly…");
+    agent.setDesired("stopped");
+    await waitFor("Minecraft shutdown", async () => !agent.connected() || ["stopped", "offline"].includes(agent.status().minecraft), config.stopTimeoutMs, report, 1000, token);
+  } else {
+    agent.setDesired("stopped");
+  }
+
+  if (agent.connected()) {
+    await report("Minecraft is stopped. Closing the Playit tunnel…");
+    const item = agent.playitStop();
+    await agent.waitForAction(item.id, Math.max(config.commandTimeoutMs, 30000));
+  }
+
+  return { minecraft: "stopped", playit: "stopped" };
+}
+
+async function closeServices(report = async () => {}) {
+  if (operation) throw new Error(`SMC is already ${operation}.`);
+  cooldown();
+  operation = "closing-services";
+  const token = cancellationGeneration;
+  try {
+    return await shutdownServices(report, token);
+  } finally {
+    operation = null;
+  }
+}
+
 async function stopServer(report = async () => {}) {
   if (operation) throw new Error(`SMC is already ${operation}.`);
   cooldown(); operation = "stopping";
@@ -126,15 +164,11 @@ async function stopServer(report = async () => {}) {
     assertActive(token);
     if ((await github.state()) !== "Available") return { stopped: true };
     if (!agent.connected()) throw new Error("SMC agent is offline; I can’t verify whether players are online.");
-    const current = agent.status();
-    const online = current.players?.online;
-    if (online == null) throw new Error("I can’t verify the player count yet. Try again in a few seconds.");
-    if (online > 0) throw new Error(`The server has ${online} player${online === 1 ? "" : "s"} online. SMC will not stop it until everyone leaves.`);
+
+    await shutdownServices(report, token);
+    await report("Minecraft and Playit are closed. Creating the safe server/world backup…");
     await backupServer(report);
-    agent.setDesired("stopped");
-    await report("Backup complete. No players are online. Shutting Minecraft down cleanly.");
-    await waitFor("Minecraft shutdown", async () => !agent.connected() || ["stopped", "offline"].includes(agent.status().minecraft), config.stopTimeoutMs, report, 1000, token);
-    await report("Minecraft is empty and stopped. Stopping Codespace…");
+    await report("Backup complete. Stopping the Codespace…");
     assertActive(token);
     await github.stop();
     await waitFor("Codespace shutdown", async () => ["Shutdown", "Archived"].includes(await github.state()), config.codespaceTimeoutMs, report, 2000, token);
@@ -283,17 +317,9 @@ async function backupServer(report = async () => {}) {
     return backupInFlight;
   }
   if (operation && operation !== "stopping") {
-    // A start action can reach fully-running Minecraft before its final
-    // Playit/health checks finish. In that state a backup is safe to begin;
-    // the start operation still owns the controller until it finishes.
-    if (operation !== "starting") {
-      throw new Error(`SMC is already ${operation}. Wait for the current action to finish before backing up.`);
-    }
-    const startingStatus = await liveStatus();
-    if (startingStatus.minecraft !== "running" || !startingStatus.processAlive) {
-      throw new Error(`SMC is already ${operation}. Wait for the current action to finish before backing up.`);
-    }
+    throw new Error(`SMC is already ${operation}. Wait for the current action to finish before backing up.`);
   }
+
   const ownOperation = !operation;
   if (ownOperation) operation = "backing-up";
 
@@ -306,7 +332,7 @@ async function backupServer(report = async () => {}) {
       const seconds = Math.floor(elapsed / 1000);
       const mins = Math.floor(seconds / 60);
       const secs = seconds % 60;
-      const stage = backupProgress.stage === "world" ? "🌍 Server/world backup"
+      const stage = backupProgress.stage === "world" ? "💾 Server/world backup"
         : backupProgress.stage === "complete" ? "🟢 Finalizing"
         : backupProgress.stage === "failed" ? "🔴 Failed"
         : "🔎 Checking";
@@ -319,54 +345,52 @@ async function backupServer(report = async () => {}) {
   };
 
   backupInFlight = (async () => {
-  backupProgress = { active: true, stage: "checking", message: "Checking server and agent state…", startedAt: Date.now(), updatedAt: Date.now() };
-  const progress = async (stage, message) => { backupProgress = { ...backupProgress, active: true, stage, message, updatedAt: Date.now() }; await report(message); };
-  startHeartbeat();
-  const results = { codespace: null, files: null };
-  const current = await liveStatus();
-  if (current.agent !== "online") throw new Error("SMC agent is offline.");
-  if (current.minecraft !== "running" || !current.processAlive) {
-    throw new Error(`Minecraft is ${current.minecraft}. Backups are only allowed after Minecraft is fully RUNNING.`);
-  }
-  await progress("checking", "Minecraft is fully RUNNING. Starting a consistent backup…");
-  // Never invoke the GitHub Codespaces export API while Minecraft is live.
-  // The external archive below already captures the repository/server state
-  // needed for SMC recovery without touching Codespace lifecycle state.
-  results.codespace = {
-    state: "skipped",
-    reason: "live_codespace_protected",
-    message: "Codespace export skipped while Minecraft is running to prevent lifecycle interruption."
-  };
-  await progress("world", "Live Codespace protected. Creating the server/world backup…");
-  try {
-    if (agent.connected()) {
+    backupProgress = { active: true, stage: "checking", message: "Checking server and agent state…", startedAt: Date.now(), updatedAt: Date.now() };
+    const progress = async (stage, message) => {
+      backupProgress = { ...backupProgress, active: true, stage, message, updatedAt: Date.now() };
+      await report(message);
+    };
+    startHeartbeat();
+
+    try {
+      const results = { codespace: null, files: null };
+      const current = await liveStatus();
+      if (current.agent !== "online") throw new Error("SMC agent is offline.");
+      if (current.minecraft === "running" || current.processAlive) {
+        throw new Error("Minecraft must be completely stopped before a backup can start. Use `smc close` first.");
+      }
+
+      await progress("checking", "Minecraft is fully stopped. Starting a safe backup…");
+      results.codespace = {
+        state: "skipped",
+        reason: "external_backup",
+        message: "Codespace export is not used; the server/world archive is the recovery backup."
+      };
+      await progress("world", "Creating the server/world backup…");
+
       const item = agent.backup();
       results.files = await agent.waitForAction(item.id, Math.max(config.backupTimeoutMs, config.commandTimeoutMs));
+      if (results.files?.error) {
+        throw new Error(results.files.error);
+      }
+
       await progress("complete", "Server/world backup uploaded to GitHub Releases.");
-    } else {
-      results.files = { skipped: true, reason: "Minecraft is not running." };
+      return results;
+    } catch (error) {
+      if (/cancelled by request/i.test(error.message || "")) {
+        await progress("failed", "Backup cancellation confirmed. Stopping the backup…");
+        throw new Error("Backup stopped by request.");
+      }
+      backupProgress = { ...backupProgress, active: true, stage: "failed", message: error.message, updatedAt: Date.now() };
+      throw error;
+    } finally {
+      stopHeartbeat();
     }
-  } catch (error) {
-    results.files = { error: error.message };
-    if (/cancelled by request/i.test(error.message || "")) {
-      await progress("failed", "Backup cancellation confirmed. Stopping the backup…");
-    } else {
-      await report("Server/world backup failed: " + error.message);
-    }
-  }
-  if (results.files?.error) {
-    if (/cancelled by request/i.test(results.files.error || "")) {
-      throw new Error("Backup stopped by request.");
-    }
-    throw new Error(`Server/world backup failed: ${results.files.error || "unknown error"}`);
-  }
-  await progress("complete", "Backup finished successfully.");
-  return results;
   })();
+
   try {
     return await backupInFlight;
   } finally {
-    stopHeartbeat();
     backupInFlight = null;
     if (ownOperation) operation = null;
     backupProgress = { ...backupProgress, active: false, updatedAt: Date.now() };
@@ -433,7 +457,7 @@ function formatAddress(s) {
     : "🌐 **Playit address unavailable**\nStart Minecraft and wait for the tunnel to connect.";
 }
 module.exports = {
-  liveStatus, startServer, stopServer, restartServer, recoverServer, backupServer, backupStatus, backupActive, backupCancel, playitEnsure, playitRestart, formatOnline, formatWhitelist, formatHealth, formatLogs, formatCrash, formatAddress,
+  liveStatus, startServer, stopServer, closeServices, restartServer, recoverServer, backupServer, backupStatus, backupActive, backupCancel, playitEnsure, playitRestart, formatOnline, formatWhitelist, formatHealth, formatLogs, formatCrash, formatAddress,
   operation: () => operation,
   forceStop,
   automaticRecoveryEnabled,
