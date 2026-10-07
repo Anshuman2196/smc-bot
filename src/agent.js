@@ -21,7 +21,7 @@ function info() { return { connected: connected(), ageMs: seenAt ? Date.now() - 
 function status() { if (!connected()) throw new Error("SMC agent is offline"); return state; }
 function action(type, args = {}) {
   if (!connected()) throw new Error("SMC agent is offline");
-  if (state.minecraft !== "running") throw new Error("Minecraft is not running");
+  if (type !== "backup" && state.minecraft !== "running") throw new Error("Minecraft is not running");
   return enqueue(type, args);
 }
 async function waitForAction(id, timeoutMs = 15000) {
