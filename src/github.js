@@ -20,7 +20,12 @@ let backupState = { state: "never", branch: null, sha: null, completedAt: null, 
 async function exportCodespace() {
   try {
     backupState = { ...backupState, state: "starting", error: null };
-    await request("POST", `${resource()}/exports`);
+    try {
+      await request("POST", `${resource()}/exports`);
+    } catch (error) {
+      if (!/422:.*export of that codespace is already in progress/i.test(error.message)) throw error;
+      // GitHub serializes Codespace exports. Reuse the export already running.
+    }
     const deadline = Date.now() + config.backupTimeoutMs;
     while (Date.now() < deadline) {
       const current = await request("GET", `${resource()}/exports/latest`);
