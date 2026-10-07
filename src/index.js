@@ -216,7 +216,19 @@ async function handle(message, parts) {
       return working.edit("🔴 **Backup stop failed**\n\n" + error.message).catch(() => {});
     }
   }
-  if (command === "close" || command === "close-services") {\n    if (!canAdmin(message.member)) return message.reply("👑 **Admin access required to close Minecraft and Playit.**");\n    let working = await message.reply("🟡 **Closing SMC services**\\nClosing Minecraft and the Playit tunnel without stopping the Codespace…");\n    try {\n      await controller.closeServices(text => progress(working, text));\n      record(message, "close services", "completed");\n      return working.edit("⚫ **SMC services closed**\\n\\nMinecraft and Playit are stopped.\\nThe Codespace is still online.\\n\\nUse `smc start` to bring everything back.");\n    } catch (error) {\n      record(message, "close services", "error");\n      return working.edit("🔴 **SMC close failed**\\n\\n" + error.message).catch(() => {});\n    }\n  }\n  if (command === "backup") {
+  if (command === "close" || command === "close-services") {
+    if (!canAdmin(message.member)) return message.reply("👑 **Admin access required to close Minecraft and Playit.**");
+    let working = await message.reply("🟡 **Closing SMC services**\nClosing Minecraft and the Playit tunnel without stopping the Codespace…");
+    try {
+      await controller.closeServices(text => progress(working, text));
+      record(message, "close services", "completed");
+      return working.edit("⚫ **SMC services closed**\n\nMinecraft and Playit are stopped.\nThe Codespace is still online.\n\nUse smc start to bring everything back.");
+    } catch (error) {
+      record(message, "close services", "error");
+      return working.edit("🔴 **SMC close failed**\n\n" + error.message).catch(() => {});
+    }
+  }
+  if (command === "backup") {
     if (!canAdmin(message.member)) return message.reply("👑 **Admin access required for backup.**");
     let working = await message.reply("💾 **SMC backup**\nStarting a protected backup…");
     try {
