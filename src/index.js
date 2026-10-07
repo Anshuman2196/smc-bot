@@ -211,6 +211,7 @@ async function handle(message, parts) {
     "`smc start` — start Minecraft",
     "`smc stop` — stop when empty",
     "`smc restart` — restart safely",
+    "`smc force-stop` — immediately stop SMC and cancel the current action",
     "",
     "📊 **Information**",
     "`smc status` — server status",
@@ -233,6 +234,26 @@ async function handle(message, parts) {
     "",
     "⚙️ `smc admin` — admin controls"
   ].join("\n"));
+  if (command === "force-stop" || command === "forcestop") {
+    if (!canAdmin(message.member)) return message.reply("👑 **Admin access required for force-stop.**");
+    let working = null;
+    try {
+      working = await message.reply("🔴 **FORCE STOPPING SMC**\nCancelling the current operation and shutting everything down…");
+      const result = await controller.forceStop();
+      record(message, "force-stop", "completed");
+      return working.edit(
+        result.stopped
+          ? "⚫ **SMC force-stopped**\n\nThe current SMC action was cancelled. Minecraft is forced to stay stopped and the Codespace shutdown was requested."
+          : "🟡 **SMC force-stop requested**\n\nThe current action was cancelled and Minecraft was forced toward a stopped state."
+      ).catch(() => {});
+    } catch (error) {
+      record(message, "force-stop", "error");
+      const text = String(error.message || error);
+      if (working) return working.edit("🔴 **Force-stop failed**\n" + text).catch(() => {});
+      return message.reply("🔴 **Force-stop failed**\n" + text);
+    }
+  }
+
   if (!canControl(message.member)) return message.reply("🔒 **Control access required.**");
   if (locked) return message.reply("🔒 **SMC controls are locked.**");
   const name = parts[2];
@@ -336,7 +357,7 @@ setInterval(async () => {
     const s = await controller.liveStatus();
     const compact = [s.codespace, s.minecraft, s.playit, s.publicAddress, s.players?.online ?? null].join("|");
 
-    if (!controller.operation() && agent.info().desiredMinecraft === "running" &&
+    if (!controller.operation() && controller.automaticRecoveryEnabled() &&
         (s.codespace !== "online" || s.agent !== "online" || s.minecraft !== "running")) {
       try {
         const recovered = await controller.recoverServer();
@@ -356,7 +377,7 @@ setInterval(async () => {
     if (s.crashed) {
       const key = `${s.lastCrashAt || "unknown"}:${s.lastExit ?? "unknown"}`;
       if (crashRecovery.key !== key) crashRecovery = { key, attempts: 0, lastAttemptAt: 0 };
-      if (crashRecovery.attempts < config.crashMaxRetries && Date.now() - crashRecovery.lastAttemptAt >= config.crashCooldownMs && !controller.operation()) {
+      if (crashRecovery.attempts < config.crashMaxRetries && Date.now() - crashRecovery.lastAttemptAt >= config.crashCooldownMs && !controller.operation() && controller.automaticRecoveryEnabled()) {
         crashRecovery.attempts += 1;
         crashRecovery.lastAttemptAt = Date.now();
         await notify("🚨 **Minecraft just crashed.\nExit code: **" + (s.lastExit ?? "unknown") + "**\nI’m going to try bringing it back up (attempt " + crashRecovery.attempts + "/" + config.crashMaxRetries + ").\n\nLast few log lines:\n```\n" + (s.logTail || []).slice(-8).join("\n").slice(-1800) + "\n```");
