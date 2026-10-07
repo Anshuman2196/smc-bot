@@ -6,7 +6,34 @@ async function request(method, path) {
   return response.status === 204 ? null : response.json();
 }
 const resource = () => `/user/codespaces/${encodeURIComponent(config.codespaceName)}`;
+let backupState = { state: "never", branch: null, sha: null, completedAt: null, error: null };
+
+async function exportCodespace() {
+  try {
+    backupState = { ...backupState, state: "starting", error: null };
+    await request("POST", `${resource()}/exports`);
+    const deadline = Date.now() + config.backupTimeoutMs;
+    while (Date.now() < deadline) {
+      const current = await request("GET", `${resource()}/exports/latest`);
+      backupState = {
+        state: current.state || "unknown",
+        branch: current.branch || null,
+        sha: current.sha || null,
+        completedAt: current.completed_at || null,
+        error: null
+      };
+      if (current.state === "succeeded") return backupState;
+      if (["failed", "errored"].includes(current.state)) throw new Error("Codespace export failed.");
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+    throw new Error("Codespace export timed out.");
+  } catch (error) {
+    backupState = { ...backupState, state: "failed", error: error.message };
+    throw error;
+  }
+}
+function backupStatus() { return { ...backupState }; }
 async function state() { return (await request("GET", resource())).state; }
 async function start() { return request("POST", `${resource()}/start`); }
 async function stop() { return request("POST", `${resource()}/stop`); }
-module.exports = { state, start, stop };
+module.exports = { state, start, stop, exportCodespace, backupStatus };
