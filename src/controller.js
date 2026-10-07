@@ -333,6 +333,15 @@ async function backupServer(report = async () => {}) {
     backupProgress = { ...backupProgress, active: false, updatedAt: Date.now() };
   }
 }
+async function backupCancel(report = async () => {}) {
+  if (!backupInFlight) throw new Error("No SMC backup is currently running.");
+  if (!agent.connected()) throw new Error("SMC agent is offline; I can’t cancel the backup safely.");
+  await report("Requesting the SMC agent to stop the active backup…");
+  const item = agent.backupCancel();
+  const result = await agent.waitForAction(item.id, Math.max(config.commandTimeoutMs, 30000));
+  await report("Backup cancellation request accepted by the SMC agent.");
+  return result;
+}
 async function requireLive() {
   const s = await liveStatus();
   if (s.agent !== "online") throw new Error("SMC agent is offline.");
@@ -385,7 +394,7 @@ function formatAddress(s) {
     : "🌐 **Playit address unavailable**\nStart Minecraft and wait for the tunnel to connect.";
 }
 module.exports = {
-  liveStatus, startServer, stopServer, restartServer, recoverServer, backupServer, backupStatus, backupActive, playitEnsure, playitRestart, formatOnline, formatWhitelist, formatHealth, formatLogs, formatCrash, formatAddress,
+  liveStatus, startServer, stopServer, restartServer, recoverServer, backupServer, backupStatus, backupActive, backupCancel, playitEnsure, playitRestart, formatOnline, formatWhitelist, formatHealth, formatLogs, formatCrash, formatAddress,
   operation: () => operation,
   forceStop,
   automaticRecoveryEnabled,
