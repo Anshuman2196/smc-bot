@@ -48,5 +48,6 @@ function deop(name) { return action("deop", { name }); }
 function say(message) { return action("say", { message }); }
 function command(command) { return action("command", { command }); }
 function save() { return action("save"); }
+function backup() { return action("backup"); }
 function propertySet(key, value) { return action("property.set", { key, value }); }
-module.exports = { authenticated, connected, sync, info, status, setDesired, restart, action, waitForAction, whitelistAdd, whitelistRemove, whitelistClear, kick, ban, pardon, op, deop, say, command, save, propertySet };
+module.exports = { authenticated, connected, sync, info, status, setDesired, restart, action, waitForAction, whitelistAdd, whitelistRemove, whitelistClear, kick, ban, pardon, op, deop, say, command, save, backup, propertySet };
